@@ -1,0 +1,15 @@
+/.gradle/
+/.idea/
+/build/
+**/build/
+/local.properties
+*.iml
+.DS_Store
+**/*.apk
+**/*.aab
+server/data/scores/*/
+!server/data/scores/.gitkeep
+server/data/marker_temp/
+__pycache__/
+*.pyc
+.venv/

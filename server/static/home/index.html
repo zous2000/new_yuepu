@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>乐谱库 — 首页</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; background: #121212; color: #eee; min-height: 100vh; }
+    a { color: #90caf9; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;
+      padding: 0.85rem 1.25rem; background: #1a1a1a; border-bottom: 1px solid #333;
+    }
+    .topbar h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+    .top-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    .btn {
+      display: inline-block; padding: 0.45rem 0.95rem; border-radius: 8px; border: none; cursor: pointer;
+      font-size: 0.9rem; font-family: inherit;
+    }
+    .btn-primary { background: #1976d2; color: #fff; }
+    .btn-primary:hover { filter: brightness(1.08); }
+    .btn-ghost { background: #2a2a2a; color: #e0e0e0; border: 1px solid #444; }
+    .btn-ghost:hover { background: #333; }
+    .token-row {
+      padding: 0.5rem 1.25rem; background: #161616; font-size: 0.82rem; color: #9e9e9e;
+      display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+    }
+    .token-row input[type="password"] {
+      flex: 1; min-width: 200px; max-width: 360px; padding: 0.35rem 0.5rem; border-radius: 6px;
+      border: 1px solid #444; background: #0d0d0d; color: #eee;
+    }
+    .layout {
+      display: flex; align-items: flex-start; gap: 0; max-width: 1400px; margin: 0 auto;
+      padding: 1rem 0 1rem 1.25rem; min-height: calc(100vh - 120px);
+    }
+    .main-col { flex: 1; min-width: 0; padding-right: 0.5rem; }
+    .hint { font-size: 0.85rem; color: #9e9e9e; margin: 0 0 1rem; line-height: 1.5; }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+      gap: 1rem;
+    }
+    .card {
+      display: flex; flex-direction: column;
+      background: #1e1e1e; border-radius: 10px; overflow: hidden; border: 1px solid #333;
+      cursor: pointer; transition: border-color 0.15s, transform 0.12s;
+    }
+    .card:hover { border-color: #5c6bc0; transform: translateY(-2px); }
+    /* 固定比例缩略区，避免竖长图在 flex 卡片里撑高整卡；图片裁切居中偏上（谱面顶部） */
+    .card .thumb-wrap {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      flex-shrink: 0;
+      min-height: 0;
+      overflow: hidden;
+      position: relative;
+      background: #2a2a2a;
+    }
+    .card .thumb-wrap img {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 15%;
+      display: block;
+    }
+    .card .thumb-ph {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #666;
+      font-size: 0.75rem;
+    }
+    .card .meta { padding: 0.5rem 0.6rem 0.45rem; font-size: 0.82rem; line-height: 1.3; flex: 1; }
+    .card .title { font-weight: 600; color: #ececec; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .card .sub { font-size: 0.72rem; color: #888; margin-top: 0.25rem; }
+    .card-actions { padding: 0 0.6rem 0.6rem; }
+    .btn-delete {
+      width: 100%; padding: 0.38rem 0.5rem; border-radius: 6px; border: 1px solid #8e3a3a;
+      background: #291515; color: #e57373; font-size: 0.72rem; cursor: pointer; font-family: inherit;
+    }
+    .btn-delete:hover { background: #3d2222; color: #ffab91; }
+    .btn-delete:disabled { opacity: 0.45; cursor: not-allowed; }
+    .alpha-rail {
+      position: sticky; top: 1rem; width: 40px; flex-shrink: 0;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 0.35rem 0.25rem; margin-right: 0.35rem;
+      background: #1a1a1a; border-radius: 8px; border: 1px solid #333; max-height: 85vh; overflow-y: auto;
+    }
+    .alpha-rail button {
+      width: 30px; min-height: 26px; padding: 0; border: none; border-radius: 4px;
+      background: transparent; color: #b0bec5; font-size: 0.72rem; font-weight: 600; cursor: pointer;
+      font-family: inherit;
+    }
+    .alpha-rail button:hover { background: #333; color: #fff; }
+    .alpha-rail button.active { background: #3949ab; color: #fff; }
+    .alpha-rail .alpha-all { font-size: 0.65rem; margin-bottom: 4px; width: auto; padding: 2px 4px; }
+    #status { color: #ffb74d; font-size: 0.88rem; margin-top: 0.75rem; min-height: 1.2em; }
+    .empty { color: #757575; padding: 2rem 1rem; text-align: center; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>乐谱库</h1>
+    <div class="top-actions">
+      <a class="btn btn-primary" href="/marker/">新增曲目</a>
+      <a class="btn btn-ghost" href="/viewer/">阅览</a>
+    </div>
+  </header>
+  <div class="token-row">
+    <span>App Token（与服务器 <code>APP_TOKEN</code> 一致）</span>
+    <input type="password" id="appToken" placeholder="dev-app-token-change-me" autocomplete="off" />
+    <button type="button" class="btn btn-ghost" id="btnReload">刷新列表</button>
+  </div>
+  <div class="layout">
+    <div class="main-col">
+      <p class="hint">以下为已打点、谱图与音频齐全的可演奏曲包。点击卡片进入阅览；卡片下方可<strong>删除</strong>服务器上的该套资源（需 Token）。删除若仍提示 405，请<strong>重启后端到最新代码</strong>并<strong>强制刷新</strong>本页（Ctrl+F5）。右侧按曲目标题<strong>首字拼音首字母</strong>筛选（英文取首字母，数字等归入 #）。</p>
+      <div id="grid"></div>
+      <div id="status"></div>
+    </div>
+    <aside class="alpha-rail" id="alphaRail" aria-label="拼音首字母检索"></aside>
+  </div>
+
+  <script>
+    const LS_TOKEN = "yuepu_viewer_app_token";
+    const gridEl = document.getElementById("grid");
+    const statusEl = document.getElementById("status");
+    const tokenInput = document.getElementById("appToken");
+    const alphaRail = document.getElementById("alphaRail");
+
+    if (localStorage.getItem(LS_TOKEN)) tokenInput.value = localStorage.getItem(LS_TOKEN);
+    else if (!tokenInput.value.trim()) tokenInput.value = "dev-app-token-change-me";
+
+    let allScores = [];
+    let activeLetter = null;
+    const thumbUrls = [];
+
+    function httpOrigin() {
+      if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
+      return "";
+    }
+
+    function authHeaders() {
+      const t = (tokenInput.value || "").trim();
+      return t ? { Authorization: "Bearer " + t } : {};
+    }
+
+    /**
+     * 多接口回退：未部署 POST /api/scores 的旧后端会对 POST 返回 405，继续尝试
+     * /api/marker/remove-score（与发布等同前缀）、/api/delete-score、DELETE 等。
+     * 非 405 时不再重试（避免掩盖真实 404 等业务错误）。
+     */
+    async function deleteScorePackage(origin, fid) {
+      const jsonHdr = {
+        "Content-Type": "application/json",
+        ...authHeaders(),
+      };
+      const attempts = [
+        () =>
+          fetch(origin + "/api/scores", {
+            method: "POST",
+            headers: jsonHdr,
+            body: JSON.stringify({
+              action: "delete",
+              folderId: fid,
+              song_id: fid,
+            }),
+            credentials: "omit",
+            cache: "no-store",
+          }),
+        () =>
+          fetch(origin + "/api/marker/remove-score", {
+            method: "POST",
+            headers: jsonHdr,
+            body: JSON.stringify({ folderId: fid, song_id: fid }),
+            credentials: "omit",
+            cache: "no-store",
+          }),
+        () =>
+          fetch(origin + "/api/delete-score", {
+            method: "POST",
+            headers: jsonHdr,
+            body: JSON.stringify({ folderId: fid, song_id: fid }),
+            credentials: "omit",
+            cache: "no-store",
+          }),
+        () =>
+          fetch(origin + "/api/scores/delete", {
+            method: "POST",
+            headers: jsonHdr,
+            body: JSON.stringify({ folderId: fid, song_id: fid }),
+            credentials: "omit",
+            cache: "no-store",
+          }),
+        () =>
+          fetch(origin + "/api/scores/" + encodeURIComponent(fid), {
+            method: "DELETE",
+            headers: { ...authHeaders() },
+            credentials: "omit",
+            cache: "no-store",
+          }),
+      ];
+      let lastStatus = 0;
+      let lastText = "";
+      for (const run of attempts) {
+        const r = await run();
+        lastStatus = r.status;
+        if (r.ok) return { ok: true, response: r };
+        lastText = await r.text();
+        if (r.status !== 405) break;
+      }
+      return { ok: false, status: lastStatus, text: lastText };
+    }
+
+    function revokeThumbs() {
+      thumbUrls.forEach((u) => {
+        try {
+          URL.revokeObjectURL(u);
+        } catch (e) {
+          /* ignore */
+        }
+      });
+      thumbUrls.length = 0;
+    }
+
+    function filteredScores() {
+      if (!activeLetter) return allScores;
+      return allScores.filter((s) => (s.titleInitial || "#") === activeLetter);
+    }
+
+    async function loadThumbInto(img, imagePath) {
+      const url = httpOrigin() + (imagePath.startsWith("/") ? imagePath : "/" + imagePath);
+      try {
+        const r = await fetch(url, { headers: { ...authHeaders() }, credentials: "omit", cache: "no-store" });
+        if (!r.ok) throw new Error(String(r.status));
+        const blob = await r.blob();
+        const ou = URL.createObjectURL(blob);
+        thumbUrls.push(ou);
+        img.src = ou;
+      } catch (e) {
+        img.replaceWith(Object.assign(document.createElement("div"), { className: "thumb-ph", textContent: "无预览" }));
+      }
+    }
+
+    function renderAlphaRail() {
+      const letters = new Set();
+      allScores.forEach((s) => letters.add(s.titleInitial || "#"));
+      const order = ["全部"].concat(
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
+        ["#"]
+      );
+      alphaRail.innerHTML = "";
+      order.forEach((L) => {
+        if (L === "全部") {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "alpha-all";
+          b.textContent = "全";
+          b.title = "显示全部";
+          b.addEventListener("click", () => {
+            activeLetter = null;
+            renderGrid();
+            syncAlphaActive();
+          });
+          alphaRail.appendChild(b);
+          return;
+        }
+        if (!letters.has(L)) return;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = L;
+        b.title = "首字母 " + L;
+        b.addEventListener("click", () => {
+          activeLetter = L;
+          renderGrid();
+          syncAlphaActive();
+        });
+        alphaRail.appendChild(b);
+      });
+      syncAlphaActive();
+    }
+
+    function syncAlphaActive() {
+      alphaRail.querySelectorAll("button").forEach((b) => {
+        if (b.classList.contains("alpha-all")) {
+          b.classList.toggle("active", activeLetter === null);
+        } else {
+          b.classList.toggle("active", b.textContent === activeLetter);
+        }
+      });
+    }
+
+    function renderGrid() {
+      revokeThumbs();
+      gridEl.innerHTML = "";
+      const list = filteredScores();
+      if (list.length === 0) {
+        gridEl.innerHTML =
+          '<div class="empty" style="grid-column:1/-1">' +
+          (allScores.length === 0
+            ? "暂无符合条件的曲包。请先在打点小工具完成标注并点「上传到服务器」发布。"
+            : "当前字母下没有曲目。") +
+          "</div>";
+        return;
+      }
+      list.forEach((s) => {
+        const fid = s.folderId || s.songId;
+        const card = document.createElement("div");
+        card.className = "card";
+        card.setAttribute("role", "button");
+        const tw = document.createElement("div");
+        tw.className = "thumb-wrap";
+        const img = document.createElement("img");
+        img.alt = s.title || fid;
+        tw.appendChild(img);
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.innerHTML =
+          '<div class="title"></div><div class="sub"></div>';
+        meta.querySelector(".title").textContent = s.title || s.songId || fid;
+        meta.querySelector(".sub").textContent =
+          (s.measureCount != null ? s.measureCount + " 小节 · " : "") + (s.titleInitial || "#");
+        const actions = document.createElement("div");
+        actions.className = "card-actions";
+        const delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "btn-delete";
+        delBtn.textContent = "删除此套乐谱";
+        delBtn.title = "从服务器删除谱图、音频与标注（不可恢复）";
+        delBtn.addEventListener("click", async (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const origin = httpOrigin();
+          const token = (tokenInput.value || "").trim();
+          if (!origin) {
+            statusEl.textContent = "请用 http(s) 打开本站。";
+            return;
+          }
+          if (!token) {
+            statusEl.textContent = "请先填写 App Token。";
+            return;
+          }
+          const t = s.title || s.songId || fid;
+          if (
+            !confirm(
+              "确定删除「" +
+                t +
+                "」？\n服务器上的谱图、音频与标注将一并删除，且不可恢复。"
+            )
+          ) {
+            return;
+          }
+          delBtn.disabled = true;
+          statusEl.textContent = "正在删除…";
+          try {
+            const result = await deleteScorePackage(origin, fid);
+            if (!result.ok) {
+              statusEl.textContent =
+                "删除失败 HTTP " + result.status + " " + (result.text || "").slice(0, 200);
+              delBtn.disabled = false;
+              return;
+            }
+            allScores = allScores.filter((x) => (x.folderId || x.songId) !== fid);
+            renderAlphaRail();
+            renderGrid();
+            statusEl.textContent = "已删除「" + t + "」。共 " + allScores.length + " 套可演奏曲包。";
+          } catch (e) {
+            statusEl.textContent = "删除失败：" + (e && e.message ? e.message : String(e));
+            delBtn.disabled = false;
+          }
+        });
+        actions.appendChild(delBtn);
+        card.appendChild(tw);
+        card.appendChild(meta);
+        card.appendChild(actions);
+        card.addEventListener("click", () => {
+          const t = (tokenInput.value || "").trim();
+          if (t) localStorage.setItem(LS_TOKEN, t);
+          location.href = "/viewer/?open=" + encodeURIComponent(fid) + "&minimal=1";
+        });
+        gridEl.appendChild(card);
+        const imgPath = s.files && s.files.image ? s.files.image : "/api/scores/" + fid + "/sheet.jpg";
+        loadThumbInto(img, imgPath);
+      });
+    }
+
+    async function loadList() {
+      const origin = httpOrigin();
+      if (!origin) {
+        statusEl.textContent = "请用 http(s) 打开本站（勿用 file://）。";
+        return;
+      }
+      const token = (tokenInput.value || "").trim();
+      if (!token) {
+        statusEl.textContent = "请填写 App Token。";
+        return;
+      }
+      localStorage.setItem(LS_TOKEN, token);
+      statusEl.textContent = "正在加载…";
+      try {
+        const r = await fetch(origin + "/api/scores?ready=true", {
+          headers: { ...authHeaders() },
+          credentials: "omit",
+          cache: "no-store",
+        });
+        if (!r.ok) {
+          statusEl.textContent = "加载失败 HTTP " + r.status + " " + (await r.text()).slice(0, 200);
+          return;
+        }
+        const j = await r.json();
+        allScores = j.scores || [];
+        activeLetter = null;
+        renderAlphaRail();
+        renderGrid();
+        statusEl.textContent = "共 " + allScores.length + " 套可演奏曲包。";
+      } catch (e) {
+        statusEl.textContent = "请求失败：" + (e && e.message ? e.message : String(e));
+      }
+    }
+
+    document.getElementById("btnReload").onclick = () => loadList();
+    tokenInput.addEventListener("change", () => loadList());
+
+    loadList();
+  </script>
+</body>
+</html>

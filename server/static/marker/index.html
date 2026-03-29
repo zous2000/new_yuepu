@@ -1,0 +1,2235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>乐谱打点小工具</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; background: #121212; color: #eee; }
+    h1 { font-size: 1.1rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
+    .panel { background: #1e1e1e; padding: 1rem; border-radius: 8px; flex: 1; min-width: 280px; }
+    .marker-page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.75rem;
+    }
+    .marker-page-header h1 { margin: 0; flex: 1 1 auto; min-width: 0; }
+    .btn-back-marker {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      padding: 0.35rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: #2a2a2a;
+      color: #e8e8e8;
+      font-size: 0.88rem;
+      text-decoration: none;
+      font-family: inherit;
+    }
+    .btn-back-marker:hover { background: #383838; color: #fff; }
+    .marker-layout {
+      display: flex;
+      gap: 1rem;
+      align-items: stretch;
+    }
+    .marker-sidebar {
+      flex: 0 0 25%;
+      width: 25%;
+      max-width: 25%;
+      min-width: 0;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .marker-sidebar .panel {
+      flex: none;
+      min-width: 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .marker-main {
+      flex: 1 1 0;
+      min-width: 0;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      /* 侧栏较矮时仍占满「标题以下」的视口高度，与红框大区域一致 */
+      min-height: calc(100dvh - var(--marker-top-chrome));
+    }
+    .marker-main .panel {
+      flex: none;
+      min-width: 0;
+      width: 100%;
+      margin: 0;
+    }
+    /* 右侧谱面+播放器：flex 铺满主列，#wrap 吃掉除播放器外的全部高度 */
+    :root {
+      --marker-top-chrome: 6.75rem;
+    }
+    .marker-main .panel.marker-sheet-panel {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      box-sizing: border-box;
+    }
+    .marker-sheet-panel audio {
+      flex-shrink: 0;
+      width: 100%;
+    }
+    @media (max-width: 720px) {
+      .marker-layout { flex-direction: column; }
+      .marker-sidebar {
+        flex: none;
+        width: 100%;
+        max-width: none;
+      }
+    }
+    .marker-annotation-preview .preview-toolbar strong { font-size: 0.88rem; }
+    .marker-annotation-preview .preview-toolbar label { font-size: 0.78rem; }
+    label { display: block; margin-top: 0.5rem; font-size: 0.85rem; }
+    input[type="text"], input[type="file"] { width: 100%; margin-top: 0.25rem; }
+    input.marker-img-file-input {
+      position: absolute;
+      width: 0.01px;
+      height: 0.01px;
+      opacity: 0;
+      overflow: hidden;
+      z-index: -1;
+    }
+    .marker-img-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; margin-top: 0.35rem; }
+    .marker-img-row .marker-img-name {
+      font-size: 0.76rem;
+      color: #9e9e9e;
+      flex: 1 1 140px;
+      min-width: 0;
+      word-break: break-all;
+      margin: 0;
+    }
+    .marker-img-row button { margin: 0; }
+    button { margin: 0.5rem 0.5rem 0 0; padding: 0.4rem 0.8rem; cursor: pointer; }
+    .marker-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.68);
+      padding: 1rem;
+      box-sizing: border-box;
+    }
+    .marker-modal-overlay.is-open { display: flex; }
+    .marker-modal-box {
+      background: #1e1e1e;
+      border: 1px solid #444;
+      border-radius: 10px;
+      max-width: min(760px, 100%);
+      max-height: 90vh;
+      overflow: auto;
+      padding: 1rem 1.1rem;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .marker-modal-box h3 { margin: 0 0 0.45rem; font-size: 1rem; }
+    .marker-modal-hint { font-size: 0.78rem; color: #9e9e9e; margin: 0 0 0.75rem; line-height: 1.45; }
+    .marker-modal-search { display: flex; gap: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap; }
+    .marker-modal-search input[type="text"] { flex: 1; margin: 0; min-width: 120px; padding: 0.38rem 0.5rem; }
+    .marker-modal-search button { margin: 0; }
+    #qupumaoStatus { font-size: 0.8rem; color: #ffb74d; margin-bottom: 0.5rem; min-height: 1.2em; }
+    #qupumaoResults {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 0.75rem;
+      max-height: 42vh;
+      overflow-y: auto;
+      border: 1px solid #333;
+      border-radius: 6px;
+    }
+    #qupumaoResults li {
+      padding: 0.45rem 0.55rem;
+      border-bottom: 1px solid #2a2a2a;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.84rem;
+    }
+    #qupumaoResults li:last-child { border-bottom: none; }
+    #qupumaoResults li:hover { background: #252525; }
+    #qupumaoResults li.is-picked { background: rgba(33, 150, 243, 0.14); }
+    #qupumaoResults li.qupumao-row-wait { cursor: wait; color: #9e9e9e; }
+    #qupumaoResults li.qupumao-row-fail { cursor: default; color: #b98; }
+    .qupumao-row-status {
+      flex-shrink: 0;
+      font-size: 0.72rem;
+      width: 3.6em;
+      color: #888;
+      text-align: center;
+    }
+    .qupumao-row-title { flex: 1; min-width: 0; word-break: break-word; }
+    .qupumao-lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10001;
+      align-items: center;
+      justify-content: center;
+      padding: 1.25rem;
+      box-sizing: border-box;
+    }
+    .qupumao-lightbox.is-open { display: flex; }
+    .qupumao-lightbox-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.82);
+      cursor: pointer;
+    }
+    .qupumao-lightbox-inner {
+      position: relative;
+      z-index: 1;
+      max-width: min(96vw, 920px);
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .qupumao-lightbox-inner img {
+      max-width: 100%;
+      max-height: min(78vh, 720px);
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      display: block;
+      border-radius: 4px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+    .qupumao-lightbox-close {
+      position: absolute;
+      top: -0.35rem;
+      right: -0.35rem;
+      margin: 0;
+      padding: 0.2rem 0.55rem;
+      font-size: 1.35rem;
+      line-height: 1;
+      background: #333;
+      border: 1px solid #555;
+      color: #eee;
+      border-radius: 4px;
+      cursor: pointer;
+      z-index: 2;
+    }
+    .qupumao-lightbox-close:hover { background: #444; }
+    .qupumao-lightbox-cap {
+      font-size: 0.82rem;
+      color: #ddd;
+      text-align: center;
+      max-width: 100%;
+      line-height: 1.35;
+    }
+    .marker-modal-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem; }
+    .marker-modal-actions button { margin: 0; }
+    #wrap {
+      position: relative;
+      width: 100%;
+      box-sizing: border-box;
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: auto;
+      border: 1px solid #444;
+      background: #2a2a2a;
+    }
+    .sheet-stack {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 0;
+    }
+    .sheet-frame {
+      position: relative;
+      display: inline-block;
+      line-height: 0;
+      vertical-align: top;
+    }
+    #sheet {
+      display: block;
+      width: auto;
+      height: auto;
+      vertical-align: top;
+    }
+    #overlay {
+      position: absolute;
+      left: 0;
+      top: 0;
+      pointer-events: auto;
+      z-index: 1;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #hint { font-size: 0.8rem; color: #aaa; margin-top: 0.5rem; }
+    #status { min-height: 1.5em; color: #ffb74d; margin-top: 0.5rem; white-space: pre-wrap; word-break: break-word; }
+    #debugPanel { margin-top: 0.5rem; background: #111; border: 1px solid #333; border-radius: 6px; }
+    #debugPanel summary { cursor: pointer; padding: 0.35rem 0.5rem; color: #9fd3ff; font-size: 0.82rem; }
+    #debugLog { margin: 0; padding: 0.5rem; max-height: 140px; overflow: auto; font-size: 11px; color: #9fd3ff; white-space: pre-wrap; }
+    #fileProtoWarn { display: none; background: #5d4037; color: #fff; padding: 0.75rem; margin-bottom: 1rem; border-radius: 6px; font-size: 0.9rem; }
+    #fileProtoWarn code { background: rgba(0,0,0,0.25); padding: 0.1rem 0.35rem; border-radius: 4px; }
+    #markerApiWarn { display: none; background: #6a1b9a; color: #fff; padding: 0.75rem; margin-bottom: 1rem; border-radius: 6px; font-size: 0.9rem; }
+    #markerApiWarn code { background: rgba(0,0,0,0.25); padding: 0.1rem 0.35rem; border-radius: 4px; }
+    pre { background: #000; padding: 0.75rem; font-size: 11px; overflow: auto; max-height: 200px; }
+    .preview-toolbar { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .preview-toolbar label { margin: 0; display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
+    #previewTimeline {
+      position: relative;
+      height: 40px;
+      background: #0a0a0a;
+      border: 1px solid #444;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    #previewTimelineMeta { font-size: 0.8rem; color: #aaa; margin-bottom: 0.35rem; }
+    .preview-segment {
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      background: rgba(255, 193, 7, 0.35);
+      border: 1px solid rgba(255, 193, 7, 0.85);
+      border-radius: 3px;
+      cursor: pointer;
+      box-sizing: border-box;
+      min-width: 2px;
+    }
+    .preview-segment:hover { filter: brightness(1.2); }
+    .preview-segment.active {
+      background: rgba(33, 150, 243, 0.45);
+      border-color: #64b5f6;
+    }
+    #previewPlayhead {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #ef5350;
+      box-shadow: 0 0 4px rgba(239, 83, 80, 0.8);
+      pointer-events: none;
+      z-index: 5;
+      margin-left: -1px;
+    }
+    #previewMeasureList {
+      max-height: 220px;
+      overflow: auto;
+      border: 1px solid #333;
+      border-radius: 6px;
+      background: #141414;
+    }
+    .preview-measure-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.65rem;
+      font-size: 0.82rem;
+      border-bottom: 1px solid #252525;
+      cursor: pointer;
+    }
+    .preview-measure-row:last-child { border-bottom: none; }
+    .preview-measure-row:hover { background: #252525; }
+    .preview-measure-row.active { background: rgba(33, 150, 243, 0.12); }
+    .preview-measure-row .pm-id { color: #ffb74d; font-weight: 600; min-width: 3.5rem; }
+    .preview-measure-row .pm-time { color: #9e9e9e; font-variant-numeric: tabular-nums; }
+    /* 界面精简：不显示标题、高级后端、Token、调试日志（字段保留供脚本与默认值使用） */
+    .marker-producer-hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="fileProtoWarn">
+    当前是<strong>本地文件</strong>打开（地址栏以 <code>file://</code> 开头），上传与预览<strong>无法</strong>连到后端。
+    请在 <code>server</code> 目录启动服务后，用浏览器打开：<code>http://127.0.0.1:8000/marker/</code>（端口按实际为准）。
+  </div>
+  <div id="markerApiWarn"></div>
+  <header class="marker-page-header">
+    <h1>乐谱打点小工具（两点定竖线 · 双击定界）<span style="font-size:0.75rem;color:#88a;"> v2026-03-29.17</span></h1>
+    <a href="/" class="btn-back-marker">返回</a>
+  </header>
+  <div class="marker-layout">
+    <aside class="marker-sidebar">
+    <div class="panel marker-controls">
+      <label>歌曲名称</label>
+      <input type="text" id="songId" placeholder="例如 三套车（将用作曲包目录名）" />
+      <div class="marker-producer-hidden">
+        <label>标题 title</label>
+        <input type="text" id="title" placeholder="三套车" />
+      </div>
+      <label>谱面图片</label>
+      <div class="marker-img-row">
+        <input type="file" id="imgFile" class="marker-img-file-input" accept="image/*" tabindex="-1" aria-hidden="true" />
+        <button type="button" id="btnPickLocalImg">选择本地图片</button>
+        <button type="button" id="btnQupumaoSearch">网络查询谱面</button>
+        <p class="marker-img-name" id="imgFileLabel">未选择本地文件</p>
+      </div>
+      <label>音频（与练习时一致，用于听时间）</label>
+      <input type="file" id="audioFile" accept="audio/*,.mp3,.m4a,.mid,.midi" />
+      <details id="apiBaseAdvanced" class="marker-producer-hidden" style="margin-top:0.65rem;border:1px solid #333;border-radius:6px;padding:0.5rem 0.65rem;background:#181818;">
+        <summary style="cursor:pointer;color:#9e9e9e;font-size:0.86rem;user-select:none;">高级：后端根地址（多数情况不用填）</summary>
+        <p style="font-size:0.78rem;color:#888;margin:0.45rem 0 0.5rem;line-height:1.45;">
+          用浏览器直接打开 <code>http://127.0.0.1:8000/marker/</code> 时<strong>留空</strong>即可，上传会走当前站点。<br />
+          仅在<strong>本页地址与 API 不是同一个源</strong>时需要填写（例如 Cursor 内置预览、端口转发后页面域名/端口与 uvicorn 不一致、上传报 Failed to fetch 时），填实际后端，如 <code>http://127.0.0.1:8000</code>。
+        </p>
+        <label style="margin-top:0;">后端根地址</label>
+        <input type="text" id="apiBaseMarker" placeholder="留空 = 与当前页同源" autocomplete="off" style="width:100%;margin-top:0.25rem;" />
+      </details>
+      <div class="marker-producer-hidden">
+        <label>App Token（与服务器 <code>APP_TOKEN</code> 一致，用于预览暂存与发布）</label>
+        <input type="password" id="appTokenMarker" placeholder="默认 dev-app-token-change-me" autocomplete="off" style="width:100%;margin-top:0.25rem;" />
+      </div>
+      <div style="margin-top:0.75rem;">
+        <button
+          type="button"
+          id="btnUploadServer"
+          onclick="if(!window.markerPublishClick){var s=document.getElementById('status'); if(s){s.textContent='发布逻辑未加载：请按 Ctrl+F5 强制刷新本页。';}}"
+        >上传到服务器</button>
+        <button
+          type="button"
+          id="btnPreview"
+          onclick="if(!window.markerPreviewClick){var s=document.getElementById('status'); if(s){s.textContent='预览逻辑未加载：请按 Ctrl+F5 强制刷新本页。';}}"
+        >预览</button>
+        <button type="button" id="btnUndo">撤销上一小节</button>
+        <button type="button" id="btnRedoUndo">恢复撤销</button>
+        <button type="button" id="btnResetBoxHeight">重设框高</button>
+        <button type="button" id="btnExport">导出 data.json</button>
+      </div>
+      <p id="hint">① 谱面可用<strong>本地图片</strong>或<strong>网络查询谱面</strong>（曲谱猫 qupumao.com）；② 与音频就绪后打点；尚无小节时<strong>单击两点</strong>定<strong>框高</strong>；③ <strong>双击</strong>标小节；④ <strong>预览 / 上传到服务器</strong>。发布需至少 1 个小节；若服务器已有<strong>同名曲包目录</strong>（与「歌曲名称」一致），将询问是否<strong>覆盖</strong>。</p>
+      <p id="status"></p>
+      <details id="debugPanel" class="marker-producer-hidden">
+        <summary>调试日志（点开查看）</summary>
+        <pre id="debugLog"></pre>
+      </details>
+    </div>
+    <div class="panel marker-annotation-preview">
+    <div class="preview-toolbar">
+      <strong>标注结果预览</strong>
+      <label><input type="checkbox" id="previewShowLabels" checked /> 谱图上显示小节编号</label>
+      <label><input type="checkbox" id="previewHighlightCurrent" checked /> 高亮当前播放所在小节</label>
+    </div>
+    <p style="font-size:0.75rem;color:#888;margin:0 0 0.5rem 0;line-height:1.4;">时间轴与列表可点击跳转；红线为当前播放位置。小节按绑定顺序排列。</p>
+    <div id="previewTimelineMeta"></div>
+    <div id="previewTimeline" aria-label="小节时间轴"></div>
+    <div id="previewMeasureList"></div>
+    </div>
+    </aside>
+    <main class="marker-main">
+    <div class="panel marker-sheet-panel">
+      <div id="wrap">
+        <div class="sheet-stack">
+          <div class="sheet-frame">
+            <img id="sheet" alt="sheet" />
+            <canvas id="overlay"></canvas>
+          </div>
+        </div>
+      </div>
+      <audio id="audio" controls playsinline preload="auto" style="width:100%;margin-top:0;"></audio>
+    </div>
+    </main>
+  </div>
+  <pre id="preview" hidden aria-hidden="true"></pre>
+  <div id="qupumaoModal" class="marker-modal-overlay" aria-hidden="true">
+    <div class="marker-modal-box" role="dialog" aria-labelledby="qupumaoDlgTitle" onclick="event.stopPropagation()">
+      <h3 id="qupumaoDlgTitle">网络查询谱面（曲谱猫）</h3>
+      <p class="marker-modal-hint">
+        数据来源 <a href="https://www.qupumao.com/" target="_blank" rel="noopener noreferrer">www.qupumao.com</a>，
+        仅供个人学习使用；搜索由本机服务器代理。结果最多 15 条（服务端短期缓存）；搜索成功后会于本机浏览器<strong>拉取并缓存全部谱图</strong>；结果以列表展示，<strong>点击某一行的标题区域</strong>会弹出大图预览（与下载为同一张图），确认后点「下载乐谱」。
+      </p>
+      <div class="marker-modal-search">
+        <input type="text" id="qupumaoQuery" placeholder="输入歌曲名称" autocomplete="off" />
+        <button type="button" id="qupumaoDoSearch">搜索</button>
+      </div>
+      <div id="qupumaoStatus"></div>
+      <ul id="qupumaoResults" aria-label="搜索结果列表"></ul>
+      <div class="marker-modal-actions">
+        <button type="button" id="qupumaoDownload">下载乐谱</button>
+        <button type="button" id="qupumaoClose">关闭</button>
+      </div>
+    </div>
+  </div>
+  <div id="qupumaoPreviewLightbox" class="qupumao-lightbox" aria-hidden="true">
+    <div class="qupumao-lightbox-backdrop" id="qupumaoLightboxBackdrop"></div>
+    <div
+      class="qupumao-lightbox-inner"
+      role="dialog"
+      aria-modal="true"
+      aria-label="谱面大图预览"
+      onclick="event.stopPropagation()"
+    >
+      <button type="button" class="qupumao-lightbox-close" id="qupumaoLightboxClose" aria-label="关闭预览">
+        ×
+      </button>
+      <img id="qupumaoLightboxImg" src="" alt="谱面大图预览" />
+      <div id="qupumaoLightboxCaption" class="qupumao-lightbox-cap"></div>
+    </div>
+  </div>
+  <script>
+    const sheet = document.getElementById("sheet");
+    const overlay = document.getElementById("overlay");
+    const ctx =
+      overlay && typeof overlay.getContext === "function" ? overlay.getContext("2d") : null;
+    const audio = document.getElementById("audio");
+    const statusEl = document.getElementById("status");
+    const debugLogEl = document.getElementById("debugLog");
+    const preview = document.getElementById("preview");
+    const appTokenMarker = document.getElementById("appTokenMarker");
+    const apiBaseMarker = document.getElementById("apiBaseMarker");
+    /** 跳转阅览预览前写入，退出预览后用于拉取同一次 stage 的谱图/音频/data.json */
+    const LS_MARKER_RESUME = "yuepu_marker_resume_stage";
+    const savedMarkerToken = localStorage.getItem("yuepu_marker_app_token");
+    if (appTokenMarker) {
+      if (savedMarkerToken) appTokenMarker.value = savedMarkerToken;
+      else if (!appTokenMarker.value.trim()) appTokenMarker.value = "dev-app-token-change-me";
+    }
+    const savedApiBase = localStorage.getItem("yuepu_marker_api_base");
+    if (apiBaseMarker && savedApiBase) apiBaseMarker.value = savedApiBase;
+    const qApi = new URLSearchParams(location.search).get("api");
+    if (apiBaseMarker && qApi && qApi.trim()) apiBaseMarker.value = qApi.trim().replace(/\/$/, "");
+
+    if (location.protocol === "file:") {
+      const fpw = document.getElementById("fileProtoWarn");
+      if (fpw) fpw.style.display = "block";
+    }
+
+    /** 仅 http(s) 页面可连后端；file:// 下相对路径会失效 */
+    function httpOrigin() {
+      if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
+      return "";
+    }
+
+    /** 上传与资源 URL 共用：可手动填后端根地址（侧边预览等场景） */
+    function getMarkerApiBase() {
+      const v = apiBaseMarker ? (apiBaseMarker.value || "").trim().replace(/\/$/, "") : "";
+      if (v) return v;
+      return httpOrigin();
+    }
+
+    function toAbsUrl(pathOrUrl) {
+      const o = getMarkerApiBase();
+      if (!pathOrUrl || typeof pathOrUrl !== "string") return "";
+      if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) return pathOrUrl;
+      if (!o) return pathOrUrl;
+      const p = pathOrUrl.startsWith("/") ? pathOrUrl : "/" + pathOrUrl;
+      return new URL(p, o + "/").href;
+    }
+
+    function showMarkerApiWarn(html) {
+      const el = document.getElementById("markerApiWarn");
+      if (!el) return;
+      el.style.display = "block";
+      el.innerHTML = html;
+    }
+
+    function appendStatus(line) {
+      if (!line || !statusEl) return;
+      statusEl.textContent = (statusEl.textContent ? statusEl.textContent + "\n" : "") + line;
+    }
+
+    function debug(line) {
+      if (!line || !debugLogEl) return;
+      const t = new Date().toLocaleTimeString();
+      debugLogEl.textContent += "[" + t + "] " + line + "\n";
+      debugLogEl.scrollTop = debugLogEl.scrollHeight;
+    }
+
+    window.addEventListener("error", (e) => {
+      const msg = e && e.message ? e.message : "unknown error";
+      if (statusEl) statusEl.textContent = "页面脚本错误：" + msg;
+      debug("window.error: " + msg);
+    });
+    window.addEventListener("unhandledrejection", (e) => {
+      const reason = e && e.reason ? String(e.reason) : "unknown rejection";
+      if (statusEl) statusEl.textContent = "页面脚本异常：" + reason;
+      debug("unhandledrejection: " + reason);
+    });
+
+    (async function checkMarkerBackend() {
+      const base = getMarkerApiBase();
+      debug("page loaded, apiBase=" + (base || "(empty)"));
+      if (!base) return;
+      try {
+        const openUrl =
+          base.replace(/\/$/, "") + "/openapi.json?_=" + Date.now();
+        const r = await fetch(openUrl, {
+          method: "GET",
+          cache: "no-store",
+          credentials: "omit",
+        });
+        if (!r.ok) return;
+        const spec = await r.json();
+        const paths = spec.paths || {};
+        const hasPub = paths["/api/marker/publish"];
+        const hasStage = paths["/api/marker/stage"];
+        if (!hasPub || !hasStage) {
+          showMarkerApiWarn(
+            "当前连接的 API：<code>" +
+              base.replace(/\/$/, "") +
+              "</code> 返回的 OpenAPI 中<strong>没有</strong> <code>/api/marker/publish</code> 或 <code>/api/marker/stage</code>。<br />" +
+              "① 请确认<strong>本页实际访问的后端</strong>与「高级 · 后端根地址」一致（含端口）。<br />" +
+              "② 在<strong>任务管理器</strong>或终端里<strong>结束所有</strong>占用了 8000 端口的旧 <code>uvicorn</code> / Python。<br />" +
+              "③ 在仓库的 <code>server</code> 目录执行：<br /><code>python -m uvicorn app.main:app --host 0.0.0.0 --port 8000</code><br />" +
+              "④ 再对本页 <strong>Ctrl+F5</strong> 硬刷新。"
+          );
+        }
+      } catch (e) {
+        /* 忽略：离线或非同源策略 */
+        debug("openapi check failed: " + (e && e.message ? e.message : String(e)));
+      }
+    })();
+
+    const MIN_BOX_HEIGHT = 10;
+    /** 单击后延迟确认（ms），避免与「双击标小节」的第一击冲突 */
+    const HEIGHT_CLICK_ARM_MS = 280;
+    /** 两次单击设定的本次标注框高（原图坐标 px），null 表示尚未设定 */
+    let sessionBoxHeight = null;
+    /** 参考竖线：x 取第一点，yTop/yBottom 为两端（原图坐标） */
+    let heightLineRef = null;
+    /** 已确认的第一点，等待第二点单击 */
+    let heightTwoClickFirst = null;
+    let heightArmTimer = null;
+    let heightArmPoint = null;
+    let heightSecondTimer = null;
+    let heightSecondPoint = null;
+
+    let naturalW = 0, naturalH = 0;
+    /** @type {{id:number,startTimeMs:number,endTimeMs:number,rect:{x:number,y:number,w:number,h:number}}[]} */
+    let measures = [];
+    /** 被「撤销上一小节」移除的小节栈，用于「恢复撤销」 */
+    let measureRedoStack = [];
+    /** 用于避免每次 pointermove 都重建时间轴 DOM */
+    let lastMeasuresPreviewSig = "";
+    /** 第一次双击后等待第二次：记录图像坐标与起点时间(ms) */
+    let pendingDblStart = null;
+    /** @type {string|null} blob 模式时持有，便于替换时 revoke */
+    let currentImageObjectUrl = null;
+    /** @type {string|null} */
+    let currentAudioObjectUrl = null;
+    let overlaySyncAttempts = 0;
+
+    const MAX_IMAGE_DATA_URL = 85 * 1024 * 1024;
+    const MAX_AUDIO_DATA_URL = 48 * 1024 * 1024;
+
+    function formatSize(n) {
+      if (n < 1024) return n + " B";
+      if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+      return (n / 1048576).toFixed(2) + " MB";
+    }
+
+    function loadImageFromBlobUrl(f) {
+      if (currentImageObjectUrl) {
+        URL.revokeObjectURL(currentImageObjectUrl);
+        currentImageObjectUrl = null;
+      }
+      sheet.onerror = () => {
+        naturalW = 0;
+        naturalH = 0;
+        clearSheetDisplaySize();
+        statusEl.textContent =
+          "图片加载失败（blob）。请改用本地已下载的 JPG/PNG，或换 Chrome/Edge。";
+      };
+      const url = URL.createObjectURL(f);
+      currentImageObjectUrl = url;
+      sheet.onload = () => {
+        if (typeof sheet.decode === "function") {
+          sheet.decode().then(applyLoadedImage).catch(applyLoadedImage);
+        } else {
+          applyLoadedImage();
+        }
+      };
+      sheet.src = url;
+    }
+
+    function loadAudioFromBlobUrl(f) {
+      if (currentAudioObjectUrl) {
+        URL.revokeObjectURL(currentAudioObjectUrl);
+        currentAudioObjectUrl = null;
+      }
+      const url = URL.createObjectURL(f);
+      currentAudioObjectUrl = url;
+      audio.onerror = () => {
+        statusEl.textContent = "音频无法加载（blob），请换标准 MP3。";
+      };
+      audio.src = url;
+      audio.load();
+      statusEl.textContent = "音频已加载（" + formatSize(f.size) + "）。请点下方播放条试听。";
+    }
+
+    function clearSheetDisplaySize() {
+      if (!sheet) return;
+      sheet.style.width = "";
+      sheet.style.height = "";
+    }
+
+    /** 按 #wrap 可用区域等比缩放谱图，尽量铺满展示区（可略大于原图像素以便看清），保证与 canvas 坐标一致 */
+    function updateSheetDisplayBounds() {
+      const wrap = document.getElementById("wrap");
+      if (!wrap || !sheet || !naturalW || !naturalH) {
+        clearSheetDisplaySize();
+        return;
+      }
+      let maxW = wrap.clientWidth;
+      let maxH = wrap.clientHeight;
+      maxW = Math.max(32, maxW);
+      maxH = Math.max(32, maxH);
+      const rw = maxW / naturalW;
+      const rh = maxH / naturalH;
+      const scale = Math.min(rw, rh);
+      const dw = Math.max(1, Math.round(naturalW * scale));
+      const dh = Math.max(1, Math.round(naturalH * scale));
+      sheet.style.width = dw + "px";
+      sheet.style.height = dh + "px";
+      overlaySyncAttempts = 0;
+      requestAnimationFrame(syncOverlaySize);
+    }
+
+    function syncOverlaySize() {
+      if (!ctx || !overlay) return;
+      const w = sheet.clientWidth;
+      const h = sheet.clientHeight;
+      if (naturalW > 0 && naturalH > 0 && (w < 2 || h < 2) && overlaySyncAttempts < 40) {
+        overlaySyncAttempts++;
+        requestAnimationFrame(syncOverlaySize);
+        return;
+      }
+      overlaySyncAttempts = 0;
+      overlay.width = Math.max(1, Math.floor(w));
+      overlay.height = Math.max(1, Math.floor(h));
+      overlay.style.width = w + "px";
+      overlay.style.height = h + "px";
+      redraw();
+    }
+
+    function imgToNatural(ix, iy) {
+      const sx = naturalW / sheet.clientWidth;
+      const sy = naturalH / sheet.clientHeight;
+      return { x: ix * sx, y: iy * sy };
+    }
+
+    function exportAudioFileName() {
+      const f = document.getElementById("audioFile").files[0];
+      if (!f || !f.name || f.name.indexOf(".") < 0) return "audio.mp3";
+      let ext = f.name.slice(f.name.lastIndexOf(".") + 1).toLowerCase();
+      if (ext === "mid" || ext === "midi") return "audio.mp3";
+      if (ext === "mpeg") ext = "mp3";
+      return "audio." + ext;
+    }
+
+    function buildScoreDataObject() {
+      const songId = document.getElementById("songId").value.trim() || "demo_song";
+      const title = document.getElementById("title").value.trim() || songId;
+      const imageFile = "sheet.jpg";
+      const audioFile = exportAudioFileName();
+      return {
+        songId,
+        title,
+        imageFile,
+        audioFile,
+        measures: measures.map((m) => ({
+          id: m.id,
+          startTimeMs: m.startTimeMs,
+          endTimeMs: m.endTimeMs,
+          rect: { ...m.rect },
+        })),
+      };
+    }
+
+    function setPreviewJson() {
+      if (!preview) return;
+      preview.textContent = JSON.stringify(buildScoreDataObject(), null, 2);
+    }
+
+    function redraw() {
+      if (!ctx) {
+        setPreviewJson();
+        const sig0 = measures.map((m) => m.id + ":" + m.startTimeMs + ":" + m.endTimeMs).join("|");
+        if (sig0 !== lastMeasuresPreviewSig) {
+          lastMeasuresPreviewSig = sig0;
+          refreshAnnotationPreview();
+        } else {
+          updatePreviewPlayhead();
+        }
+        return;
+      }
+      const w = overlay.width;
+      const h = overlay.height;
+      ctx.clearRect(0, 0, w, h);
+      if (!naturalW || !naturalH || w < 1 || h < 1) {
+        setPreviewJson();
+        const sig1 = measures.map((m) => m.id + ":" + m.startTimeMs + ":" + m.endTimeMs).join("|");
+        if (sig1 !== lastMeasuresPreviewSig) {
+          lastMeasuresPreviewSig = sig1;
+          refreshAnnotationPreview();
+        } else {
+          updatePreviewPlayhead();
+        }
+        return;
+      }
+      const scaleX = w / naturalW;
+      const scaleY = h / naturalH;
+      ctx.strokeStyle = "rgba(255,193,7,0.9)";
+      ctx.lineWidth = 2;
+      measures.forEach((m) => {
+        ctx.strokeRect(m.rect.x * scaleX, m.rect.y * scaleY, m.rect.w * scaleX, m.rect.h * scaleY);
+      });
+      const lblEl = document.getElementById("previewShowLabels");
+      if (lblEl && lblEl.checked && measures.length) {
+        ctx.save();
+        measures.forEach((m) => {
+          const x = m.rect.x * scaleX;
+          const y = m.rect.y * scaleY;
+          const rw = Math.max(1, m.rect.w * scaleX);
+          const rh = Math.max(1, m.rect.h * scaleY);
+          ctx.fillStyle = "rgba(255, 193, 7, 0.14)";
+          ctx.fillRect(x, y, rw, rh);
+          const fs = Math.max(11, Math.min(20, Math.min(rw, rh) * 0.35));
+          ctx.font = "bold " + fs + "px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          const cx = x + rw / 2;
+          const cy = y + rh / 2;
+          ctx.strokeStyle = "rgba(0, 0, 0, 0.55)";
+          ctx.lineWidth = 3;
+          ctx.strokeText(String(m.id), cx, cy);
+          ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+          ctx.fillText(String(m.id), cx, cy);
+        });
+        ctx.restore();
+      }
+      const hiEl = document.getElementById("previewHighlightCurrent");
+      if (hiEl && hiEl.checked && audio && isFinite(audio.currentTime)) {
+        const tMs = audio.currentTime * 1000;
+        ctx.save();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "rgba(100, 181, 246, 0.95)";
+        measures.forEach((m) => {
+          if (tMs >= m.startTimeMs && tMs < m.endTimeMs) {
+            const x = m.rect.x * scaleX;
+            const y = m.rect.y * scaleY;
+            const rw = m.rect.w * scaleX;
+            const rh = m.rect.h * scaleY;
+            ctx.strokeRect(x + 1, y + 1, Math.max(0, rw - 2), Math.max(0, rh - 2));
+          }
+        });
+        ctx.restore();
+      }
+      if (pendingDblStart && naturalH && sessionBoxHeight != null) {
+        const boxH = Math.min(sessionBoxHeight, naturalH);
+        let top = Math.round(pendingDblStart.y - boxH / 2);
+        top = Math.max(0, Math.min(top, naturalH - boxH));
+        const px = pendingDblStart.x * scaleX;
+        const ph = boxH * scaleY;
+        const py = top * scaleY;
+        ctx.save();
+        ctx.strokeStyle = "rgba(33, 150, 243, 0.9)";
+        ctx.setLineDash([5, 4]);
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px - 1, py, 2, ph);
+        ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(33, 150, 243, 0.12)";
+        ctx.fillRect(px - 1, py, 2, ph);
+        ctx.restore();
+      }
+      if (heightLineRef && naturalH) {
+        const lx = heightLineRef.x * scaleX;
+        const ly1 = heightLineRef.yTop * scaleY;
+        const ly2 = heightLineRef.yBottom * scaleY;
+        ctx.save();
+        ctx.strokeStyle = "rgba(76, 175, 80, 0.9)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(lx, ly1);
+        ctx.lineTo(lx, ly2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+      if (heightTwoClickFirst && naturalH && sessionBoxHeight == null) {
+        const hx = heightTwoClickFirst.x * scaleX;
+        const hy = heightTwoClickFirst.y * scaleY;
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 183, 77, 0.95)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(hx, hy, 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      setPreviewJson();
+      const sig = measures.map((m) => m.id + ":" + m.startTimeMs + ":" + m.endTimeMs).join("|");
+      if (sig !== lastMeasuresPreviewSig) {
+        lastMeasuresPreviewSig = sig;
+        refreshAnnotationPreview();
+      } else {
+        updatePreviewPlayhead();
+      }
+    }
+
+    function formatTimeMs(ms) {
+      if (!isFinite(ms)) return "--";
+      const total = ms / 1000;
+      const mi = Math.floor(total / 60);
+      const s = total - mi * 60;
+      const pad = s < 10 ? "0" : "";
+      return mi + ":" + pad + s.toFixed(2);
+    }
+
+    function getPreviewDurationMs() {
+      let d = 0;
+      if (audio && audio.duration && isFinite(audio.duration) && audio.duration > 0) {
+        d = Math.max(d, audio.duration * 1000);
+      }
+      measures.forEach((m) => {
+        if (m.endTimeMs > d) d = m.endTimeMs;
+      });
+      return Math.max(d, 500);
+    }
+
+    function updatePreviewPlayhead() {
+      const bar = document.getElementById("previewTimeline");
+      if (!bar) return;
+      const ph = document.getElementById("previewPlayhead");
+      if (!ph) return;
+      const durMs = getPreviewDurationMs();
+      const tMs = (audio && isFinite(audio.currentTime) ? audio.currentTime : 0) * 1000;
+      const pct = durMs > 0 ? Math.min(100, Math.max(0, (tMs / durMs) * 100)) : 0;
+      ph.style.left = pct + "%";
+      const hiEl = document.getElementById("previewHighlightCurrent");
+      const hi = hiEl ? hiEl.checked : true;
+      bar.querySelectorAll(".preview-segment").forEach((seg, i) => {
+        const m = measures[i];
+        if (!m || !hi) seg.classList.remove("active");
+        else seg.classList.toggle("active", tMs >= m.startTimeMs && tMs < m.endTimeMs);
+      });
+      const list = document.getElementById("previewMeasureList");
+      if (list) {
+        list.querySelectorAll(".preview-measure-row").forEach((row, i) => {
+          const m = measures[i];
+          if (!m || !hi) row.classList.remove("active");
+          else row.classList.toggle("active", tMs >= m.startTimeMs && tMs < m.endTimeMs);
+        });
+      }
+    }
+
+    function refreshAnnotationPreview() {
+      const bar = document.getElementById("previewTimeline");
+      const meta = document.getElementById("previewTimelineMeta");
+      const list = document.getElementById("previewMeasureList");
+      if (!bar || !meta || !list) return;
+      const durMs = getPreviewDurationMs();
+      let metaStr =
+        "时间轴总长 " +
+        formatTimeMs(durMs) +
+        " · 已绑定 " +
+        measures.length +
+        " 个小节";
+      if (audio && audio.duration && isFinite(audio.duration) && audio.duration > 0) {
+        metaStr += "（音频时长 " + formatTimeMs(audio.duration * 1000) + "）";
+      }
+      if (sessionBoxHeight != null) {
+        metaStr += " · 框高 " + Math.round(sessionBoxHeight) + "px（原图）";
+      } else if (measures.length === 0) {
+        metaStr += " · 请先单击两点定竖线框高";
+      }
+      meta.textContent = metaStr;
+      bar.innerHTML = "";
+      const playhead = document.createElement("div");
+      playhead.id = "previewPlayhead";
+      bar.appendChild(playhead);
+      measures.forEach((m, i) => {
+        const seg = document.createElement("div");
+        seg.className = "preview-segment";
+        seg.title = "小节 " + m.id + " · 点击从起点播放";
+        const span = Math.max(0, m.endTimeMs - m.startTimeMs);
+        const left = (m.startTimeMs / durMs) * 100;
+        const wPct = durMs > 0 ? (span / durMs) * 100 : 0;
+        seg.style.left = left + "%";
+        seg.style.width = Math.max(wPct, 0.2) + "%";
+        seg.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          if (audio) {
+            audio.currentTime = m.startTimeMs / 1000;
+            updatePreviewPlayhead();
+            redraw();
+          }
+        });
+        bar.appendChild(seg);
+      });
+      list.innerHTML = "";
+      if (measures.length === 0) {
+        const empty = document.createElement("div");
+        empty.style.padding = "0.75rem";
+        empty.style.color = "#666";
+        empty.style.fontSize = "0.85rem";
+        empty.textContent = "暂无小节。先单击两点定竖线框高，音频就绪后再双击标记起点/终点。";
+        list.appendChild(empty);
+        updatePreviewPlayhead();
+        return;
+      }
+      measures.forEach((m) => {
+        const row = document.createElement("div");
+        row.className = "preview-measure-row";
+        row.innerHTML =
+          '<span class="pm-id">#' +
+          m.id +
+          '</span><span class="pm-time">' +
+          formatTimeMs(m.startTimeMs) +
+          " → " +
+          formatTimeMs(m.endTimeMs) +
+          "</span>";
+        row.addEventListener("click", () => {
+          if (audio) {
+            audio.currentTime = m.startTimeMs / 1000;
+            updatePreviewPlayhead();
+            redraw();
+          }
+        });
+        list.appendChild(row);
+      });
+      updatePreviewPlayhead();
+    }
+
+    function updatePreview() {
+      setPreviewJson();
+    }
+
+    function clearHeightClickTimers() {
+      if (heightArmTimer) {
+        clearTimeout(heightArmTimer);
+        heightArmTimer = null;
+      }
+      if (heightSecondTimer) {
+        clearTimeout(heightSecondTimer);
+        heightSecondTimer = null;
+      }
+      heightArmPoint = null;
+      heightSecondPoint = null;
+    }
+
+    function naturalFromOverlayClient(ev) {
+      const rect = overlay.getBoundingClientRect();
+      const n = imgToNatural(ev.clientX - rect.left, ev.clientY - rect.top);
+      return {
+        x: Math.max(0, Math.min(n.x, naturalW)),
+        y: Math.max(0, Math.min(n.y, naturalH)),
+      };
+    }
+
+    /** 两次双击的 y 为框竖直中点，求 rect.y（顶边，原图坐标） */
+    function rectTopFromMidYs(cy1, cy2) {
+      const H = currentBoxH();
+      const centerY = (cy1 + cy2) / 2;
+      let top = Math.round(centerY - H / 2);
+      const maxTop = Math.max(0, naturalH - H);
+      return Math.max(0, Math.min(top, maxTop));
+    }
+
+    /** 未完成小节的起点：与虚线预览一致的竖直中线 y（原图像素） */
+    function pendingStartMidY() {
+      if (!pendingDblStart || !naturalH) return null;
+      const H = currentBoxH();
+      if (H < MIN_BOX_HEIGHT) return null;
+      let top = Math.round(pendingDblStart.y - H / 2);
+      const maxTop = Math.max(0, naturalH - H);
+      top = Math.max(0, Math.min(top, maxTop));
+      return top + H / 2;
+    }
+
+    /** 仅当与 refY 同一条「谱行」时才吸附，避免吸附到上一行/下一行已标竖线导致整框跑偏 */
+    function rowAlignSnapTolerance() {
+      const H = currentBoxH();
+      return Math.max(H * 0.65, 28);
+    }
+
+    /**
+     * 在 clickX 左侧（严格小于）找最近的一条小节竖边；只保留 |midY - refY| 在容差内的候选（与本次点击同一谱行），
+     * 再在命中里取 x 最大者。第二下双击若 includePendingStart，含当前起点竖线。
+     */
+    function getLeftNeighborRowMidY(clickX, refY, includePendingStart) {
+      if (!naturalW || !naturalH) return null;
+      const H = currentBoxH();
+      if (H < MIN_BOX_HEIGHT) return null;
+      const tol = rowAlignSnapTolerance();
+      const candidates = [];
+      for (let i = 0; i < measures.length; i++) {
+        const m = measures[i];
+        const xL = m.rect.x;
+        const xR = m.rect.x + m.rect.w;
+        const midY = m.rect.y + m.rect.h / 2;
+        if (xL < clickX && Math.abs(midY - refY) <= tol) candidates.push({ x: xL, midY });
+        if (xR < clickX && Math.abs(midY - refY) <= tol) candidates.push({ x: xR, midY });
+      }
+      if (includePendingStart && pendingDblStart) {
+        const px = pendingDblStart.x;
+        if (px < clickX) {
+          const mid = pendingStartMidY();
+          if (mid != null && Math.abs(mid - refY) <= tol) candidates.push({ x: px, midY: mid });
+        }
+      }
+      if (!candidates.length) return null;
+      let best = candidates[0];
+      for (let j = 1; j < candidates.length; j++) {
+        if (candidates[j].x > best.x) best = candidates[j];
+      }
+      return best.midY;
+    }
+
+    /** @param pSecond 第二点 @param pFirstOpt 若省略则用 heightTwoClickFirst */
+    function finalizeHeightLine(pSecond, pFirstOpt) {
+      const pFirst = pFirstOpt != null ? pFirstOpt : heightTwoClickFirst;
+      if (!pFirst || !pSecond) return;
+      const y0 = pFirst.y;
+      const y1 = pSecond.y;
+      const hRaw = Math.abs(y1 - y0);
+      if (hRaw < MIN_BOX_HEIGHT) {
+        statusEl.textContent =
+          "竖线太短（需 ≥ " + MIN_BOX_HEIGHT + " px），已清除。请重新单击两点。";
+        heightTwoClickFirst = null;
+        redraw();
+        return;
+      }
+      const yTop = Math.min(y0, y1);
+      const yBottom = Math.max(y0, y1);
+      sessionBoxHeight = Math.min(Math.round(hRaw), naturalH);
+      heightLineRef = { x: pFirst.x, yTop, yBottom };
+      heightTwoClickFirst = null;
+      lastMeasuresPreviewSig = "";
+      refreshAnnotationPreview();
+      redraw();
+      statusEl.textContent =
+        "框高 " +
+        sessionBoxHeight +
+        " px。双击时让光标落在小节框的<strong>竖直中点</strong>上。";
+    }
+
+    /** 将播放头定位到最后一小节末尾（从预览返回等） */
+    function seekAudioToLastMeasureEnd() {
+      if (!measures.length || !audio) return;
+      const applySeek = () => {
+        if (!audio || !measures.length) return;
+        const lastEnd = measures[measures.length - 1].endTimeMs;
+        let t = lastEnd / 1000;
+        if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
+          t = Math.min(t, Math.max(0, audio.duration - 0.04));
+        }
+        try {
+          audio.currentTime = t;
+        } catch (e) {
+          /* ignore */
+        }
+        updatePreviewPlayhead();
+        redraw();
+      };
+      if (audio.readyState >= 1) applySeek();
+      else audio.addEventListener("loadedmetadata", applySeek, { once: true });
+    }
+
+    /** @param preserveAnnotation 为 true 时不清空小节与框高（用于从预览返回后的恢复） */
+    function applyLoadedImage(preserveAnnotation) {
+      const keep = preserveAnnotation === true;
+      naturalW = sheet.naturalWidth;
+      naturalH = sheet.naturalHeight;
+      if (!naturalW || !naturalH) {
+        clearSheetDisplaySize();
+        statusEl.textContent = "图片无法读取尺寸，请换一张图或检查格式（建议 JPG/PNG）";
+        return;
+      }
+      if (!keep) {
+        sessionBoxHeight = null;
+        heightLineRef = null;
+        pendingDblStart = null;
+        heightTwoClickFirst = null;
+        clearHeightClickTimers();
+        measures = [];
+        measureRedoStack = [];
+      }
+      updateSheetDisplayBounds();
+      lastMeasuresPreviewSig = "";
+      refreshAnnotationPreview();
+      redraw();
+      if (keep) {
+        if (sessionBoxHeight != null && naturalH) {
+          sessionBoxHeight = Math.min(sessionBoxHeight, naturalH);
+        }
+        seekAudioToLastMeasureEnd();
+        statusEl.textContent =
+          "已从预览恢复编辑现场：" +
+          measures.length +
+          " 个小节。谱图与音频来自服务器暂存，文件选择框为空属正常；可继续编辑或发布。";
+      } else {
+        statusEl.textContent =
+          "图片已加载（" +
+          naturalW +
+          "×" +
+          naturalH +
+          "）。请先在谱面上<strong>单击两点</strong>定竖线框高，再双击标小节（需音频就绪）。";
+      }
+    }
+
+    async function restoreMarkerFromStageSession(stageId) {
+      const origin = getMarkerApiBase();
+      if (!origin) throw new Error("无法恢复：缺少后端地址（请用 http(s) 打开或填写「后端根地址」）");
+      const root = origin.replace(/\/$/, "");
+      const enc = encodeURIComponent(stageId);
+      const dataRes = await fetch(root + "/api/marker/asset/" + enc + "/data.json", {
+        credentials: "omit",
+        cache: "no-store",
+      });
+      if (!dataRes.ok) throw new Error("data.json HTTP " + dataRes.status);
+      const obj = await dataRes.json();
+      const imgName = obj.imageFile || "sheet.jpg";
+      const audName = obj.audioFile || "audio.mp3";
+      const imgRes = await fetch(
+        root + "/api/marker/asset/" + enc + "/" + encodeURIComponent(imgName),
+        { credentials: "omit", cache: "no-store" }
+      );
+      if (!imgRes.ok) throw new Error("谱图 HTTP " + imgRes.status);
+      const audRes = await fetch(
+        root + "/api/marker/asset/" + enc + "/" + encodeURIComponent(audName),
+        { credentials: "omit", cache: "no-store" }
+      );
+      if (!audRes.ok) throw new Error("音频 HTTP " + audRes.status);
+      const imgBlob = await imgRes.blob();
+      const audBlob = await audRes.blob();
+
+      if (currentImageObjectUrl) {
+        URL.revokeObjectURL(currentImageObjectUrl);
+        currentImageObjectUrl = null;
+      }
+      if (currentAudioObjectUrl) {
+        URL.revokeObjectURL(currentAudioObjectUrl);
+        currentAudioObjectUrl = null;
+      }
+      currentImageObjectUrl = URL.createObjectURL(imgBlob);
+      currentAudioObjectUrl = URL.createObjectURL(audBlob);
+
+      const sidEl = document.getElementById("songId");
+      const titEl = document.getElementById("title");
+      if (sidEl && obj.songId != null && String(obj.songId).trim()) sidEl.value = String(obj.songId).trim();
+      if (titEl && obj.title != null && String(obj.title).trim()) titEl.value = String(obj.title).trim();
+
+      measureRedoStack = [];
+      const rawM = obj.measures;
+      measures = Array.isArray(rawM)
+        ? rawM.map((m) => ({
+            id: m.id,
+            startTimeMs: m.startTimeMs,
+            endTimeMs: m.endTimeMs,
+            rect: m.rect
+              ? {
+                  x: m.rect.x,
+                  y: m.rect.y,
+                  w: m.rect.w,
+                  h: m.rect.h,
+                }
+              : { x: 0, y: 0, w: 0, h: 0 },
+          }))
+        : [];
+
+      sessionBoxHeight = null;
+      heightLineRef = null;
+      if (measures.length && measures[0].rect && measures[0].rect.h > 0) {
+        sessionBoxHeight = Math.round(measures[0].rect.h);
+      }
+      pendingDblStart = null;
+      heightTwoClickFirst = null;
+      clearHeightClickTimers();
+
+      sheet.onerror = () => {
+        naturalW = 0;
+        naturalH = 0;
+        clearSheetDisplaySize();
+        statusEl.textContent = "恢复时谱图解码失败。";
+      };
+      sheet.onload = () => {
+        if (typeof sheet.decode === "function") {
+          sheet.decode().then(() => applyLoadedImage(true)).catch(() => applyLoadedImage(true));
+        } else {
+          applyLoadedImage(true);
+        }
+      };
+      sheet.src = currentImageObjectUrl;
+
+      audio.onerror = () => {
+        statusEl.textContent =
+          (statusEl.textContent || "").replace(/\s*（音频[^\）]*）\s*$/, "") +
+          "（音频若无法播放可重新选择本地文件）";
+      };
+      audio.src = currentAudioObjectUrl;
+      audio.load();
+    }
+
+    function currentBoxH() {
+      if (sessionBoxHeight == null || !naturalH) return 0;
+      return Math.min(sessionBoxHeight, naturalH);
+    }
+
+    const imgFileInput = document.getElementById("imgFile");
+    const imgFileLabelEl = document.getElementById("imgFileLabel");
+    const btnPickLocalImg = document.getElementById("btnPickLocalImg");
+    if (btnPickLocalImg && imgFileInput) {
+      btnPickLocalImg.addEventListener("click", () => imgFileInput.click());
+    }
+    if (imgFileInput) imgFileInput.addEventListener("change", (e) => {
+      const f = e.target.files[0];
+      if (!f) {
+        if (imgFileLabelEl) imgFileLabelEl.textContent = "未选择本地文件";
+        return;
+      }
+      if (imgFileLabelEl) imgFileLabelEl.textContent = f.name + "（" + formatSize(f.size) + "）";
+      if (currentImageObjectUrl) {
+        URL.revokeObjectURL(currentImageObjectUrl);
+        currentImageObjectUrl = null;
+      }
+      let hint = "已选图片：" + f.name + "（" + formatSize(f.size) + "）";
+      if (f.size === 0) {
+        statusEl.textContent =
+          hint +
+          " — 大小为 0，无法加载。常见于「照片/iPhone 导入」等云端占位：请先把文件**复制到桌面或文档**再选，或右键文件选「始终保留在此设备上」。";
+        return;
+      }
+      if (/^import-/i.test(f.name)) {
+        hint += "（若为系统导入文件仍失败，请复制到普通文件夹后再选）";
+      }
+      statusEl.textContent = hint + "，正在读取…";
+
+      if (f.size > MAX_IMAGE_DATA_URL) {
+        statusEl.textContent += " 文件较大，使用 blob 加载。";
+        loadImageFromBlobUrl(f);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onerror = () => {
+        naturalW = 0;
+        naturalH = 0;
+        clearSheetDisplaySize();
+        statusEl.textContent = "读取图片失败，请重试或换一张图。";
+      };
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        if (typeof dataUrl !== "string") return;
+        sheet.onerror = () => {
+          naturalW = 0;
+          naturalH = 0;
+          clearSheetDisplaySize();
+          statusEl.textContent =
+            "图片解码失败（可能不是浏览器支持的格式）。请导出为 JPG/PNG 再选。";
+        };
+        sheet.onload = () => {
+          if (typeof sheet.decode === "function") {
+            sheet.decode().then(applyLoadedImage).catch(applyLoadedImage);
+          } else {
+            applyLoadedImage();
+          }
+        };
+        sheet.src = dataUrl;
+      };
+      reader.readAsDataURL(f);
+    });
+
+    const audioFileInput = document.getElementById("audioFile");
+    if (audioFileInput) audioFileInput.addEventListener("change", (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      if (currentAudioObjectUrl) {
+        URL.revokeObjectURL(currentAudioObjectUrl);
+        currentAudioObjectUrl = null;
+      }
+      let hint = "已选音频：" + f.name + "（" + formatSize(f.size) + "）";
+      if (f.size === 0) {
+        statusEl.textContent =
+          hint +
+          " — 大小为 0，无法播放。请将 MP3 复制到本机文件夹后再选（勿选仅云端的占位）。";
+        audio.removeAttribute("src");
+        audio.load();
+        return;
+      }
+      statusEl.textContent = hint + "，正在读取…";
+
+      if (f.size > MAX_AUDIO_DATA_URL) {
+        statusEl.textContent += " 文件较大，使用 blob 加载。";
+        loadAudioFromBlobUrl(f);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onerror = () => {
+        statusEl.textContent = "读取音频失败，请重试或换 MP3。";
+      };
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        if (typeof dataUrl !== "string") return;
+        audio.onerror = () => {
+          statusEl.textContent = "音频解码失败，请换标准 MP3（如用 FFmpeg 重编码）。";
+        };
+        audio.src = dataUrl;
+        const onMeta = () => {
+          audio.removeEventListener("loadedmetadata", onMeta);
+          if (audio.duration && isFinite(audio.duration)) {
+            statusEl.textContent =
+              "音频就绪（" + formatSize(f.size) + "），时长约 " + Math.round(audio.duration) + " 秒。可点下方播放条播放。";
+          }
+        };
+        audio.addEventListener("loadedmetadata", onMeta);
+        audio.load();
+        statusEl.textContent =
+          "音频数据已载入，正在解码…若时长仍为 0:00 请等待数秒或点播放键。";
+      };
+      reader.readAsDataURL(f);
+    });
+
+    window.addEventListener("resize", () => {
+      if (naturalW) updateSheetDisplayBounds();
+    });
+    (function bindWrapResizeObserver() {
+      const wrapEl = document.getElementById("wrap");
+      if (!wrapEl || typeof ResizeObserver === "undefined") return;
+      const ro = new ResizeObserver(() => {
+        if (naturalW) updateSheetDisplayBounds();
+      });
+      ro.observe(wrapEl);
+    })();
+
+    if (overlay) {
+      overlay.addEventListener("click", (e) => {
+        if (!naturalW || !naturalH || e.button !== 0) return;
+        if (measures.length > 0 || pendingDblStart) return;
+        if (sessionBoxHeight != null) return;
+
+        if (e.detail >= 2) {
+          clearHeightClickTimers();
+          return;
+        }
+        if (e.detail !== 1) return;
+
+        const p = naturalFromOverlayClient(e);
+
+        if (!heightTwoClickFirst) {
+          if (heightArmTimer && heightArmPoint) {
+            const p1 = heightArmPoint;
+            clearHeightClickTimers();
+            finalizeHeightLine(p, p1);
+            return;
+          }
+          clearHeightClickTimers();
+          heightArmPoint = p;
+          heightArmTimer = setTimeout(() => {
+            heightArmTimer = null;
+            heightTwoClickFirst = heightArmPoint;
+            heightArmPoint = null;
+            statusEl.textContent = "已确认竖线第一点，请再<strong>单击</strong>第二点（竖线另一端）。";
+            redraw();
+          }, HEIGHT_CLICK_ARM_MS);
+          return;
+        }
+
+        if (heightSecondTimer && heightSecondPoint) {
+          clearHeightClickTimers();
+          finalizeHeightLine(p, heightTwoClickFirst);
+          return;
+        }
+        clearHeightClickTimers();
+        heightSecondPoint = p;
+        heightSecondTimer = setTimeout(() => {
+          heightSecondTimer = null;
+          const p2 = heightSecondPoint;
+          heightSecondPoint = null;
+          finalizeHeightLine(p2);
+        }, HEIGHT_CLICK_ARM_MS);
+      });
+
+      overlay.addEventListener("dblclick", (e) => {
+        e.preventDefault();
+        clearHeightClickTimers();
+        heightTwoClickFirst = null;
+        if (!naturalW || !naturalH) {
+          statusEl.textContent = "请先加载谱面图片。";
+          return;
+        }
+        if (!audio || !audio.src) {
+          statusEl.textContent = "请先选择音频（或本机加载音频）后再双击打点。";
+          return;
+        }
+        if (sessionBoxHeight == null || currentBoxH() < MIN_BOX_HEIGHT) {
+          statusEl.textContent =
+            "请先在谱面上<strong>单击两点</strong>定竖线框高（两次独立单击，竖直间距即框高）。";
+          return;
+        }
+        const rect = overlay.getBoundingClientRect();
+        const ix = e.clientX - rect.left;
+        const iy = e.clientY - rect.top;
+        const n = imgToNatural(ix, iy);
+        const x2 = Math.max(0, Math.min(n.x, naturalW));
+        const y2 = Math.max(0, Math.min(n.y, naturalH));
+
+        if (!pendingDblStart) {
+          const timeStartMs = Math.floor((isFinite(audio.currentTime) ? audio.currentTime : 0) * 1000);
+          let yStart = y2;
+          const rowLeft = getLeftNeighborRowMidY(x2, y2, false);
+          if (rowLeft != null) yStart = rowLeft;
+          pendingDblStart = { x: x2, y: yStart, timeStartMs };
+          audio.play().catch((err) => {
+            statusEl.textContent = "无法播放：" + (err && err.message ? err.message : String(err));
+          });
+          statusEl.textContent =
+            "小节 " + (measures.length + 1) + "：已记起点（t=" + timeStartMs + "ms）。请再次双击谱面标记终点（将暂停播放）。";
+          redraw();
+          return;
+        }
+
+        const x1 = pendingDblStart.x;
+        const y1 = pendingDblStart.y;
+        const startTimeMs = pendingDblStart.timeStartMs;
+        const rawY2 = y2;
+        const rowAtEnd = getLeftNeighborRowMidY(x2, rawY2, true);
+        const rowAtStart = getLeftNeighborRowMidY(x1, y1, false);
+        pendingDblStart = null;
+
+        audio.pause();
+        const endTimeMsRaw = Math.floor((isFinite(audio.currentTime) ? audio.currentTime : 0) * 1000);
+        const endTimeMs = Math.max(endTimeMsRaw, startTimeMs + 1);
+
+        const x = Math.min(x1, x2);
+        const w = Math.max(1, Math.abs(x2 - x1));
+        let centerY;
+        if (rowAtEnd != null) centerY = rowAtEnd;
+        else if (rowAtStart != null) centerY = rowAtStart;
+        else centerY = (y1 + rawY2) / 2;
+        const Hfin = currentBoxH();
+        let top = Math.round(centerY - Hfin / 2);
+        const maxTop = Math.max(0, naturalH - Hfin);
+        const y = Math.max(0, Math.min(top, maxTop));
+        const h = Hfin;
+
+        measureRedoStack = [];
+        const id = measures.length + 1;
+        measures.push({
+          id,
+          startTimeMs,
+          endTimeMs,
+          rect: { x, y, w, h },
+        });
+        statusEl.textContent =
+          "小节 " + id + " 完成：时间 " + startTimeMs + " → " + endTimeMs + " ms，区域 x=" + Math.round(x) + " y=" + Math.round(y) + " w=" + Math.round(w) + " h=" + h;
+        redraw();
+      });
+
+      overlay.style.pointerEvents = "auto";
+      overlay.style.position = "absolute";
+      overlay.style.left = "0";
+      overlay.style.top = "0";
+    }
+
+    function readPublishForm() {
+      const imgEl = document.getElementById("imgFile");
+      const audEl = document.getElementById("audioFile");
+      const sidEl = document.getElementById("songId");
+      const imgIn = imgEl && imgEl.files && imgEl.files[0] ? imgEl.files[0] : null;
+      const audIn = audEl && audEl.files && audEl.files[0] ? audEl.files[0] : null;
+      const token = (appTokenMarker && appTokenMarker.value ? appTokenMarker.value : "").trim();
+      const origin = getMarkerApiBase();
+      const songId = sidEl ? (sidEl.value || "").trim() : "";
+      return { imgIn, audIn, token, origin, songId };
+    }
+
+    const onPreviewClick = async () => {
+      debug("click 预览");
+      const { imgIn, audIn, token, origin } = readPublishForm();
+      if (!imgIn || !audIn) {
+        statusEl.textContent = "请先选择谱面图片和音频。";
+        return;
+      }
+      if (!token) {
+        statusEl.textContent = "请填写 App Token。";
+        return;
+      }
+      if (!origin) {
+        statusEl.textContent = "请用 http(s) 打开本页并可访问后端，或填写「后端根地址」。";
+        return;
+      }
+      const btn = document.getElementById("btnPreview");
+      if (btn) btn.disabled = true;
+      setPreviewJson();
+      statusEl.textContent = "正在准备阅览页预览…";
+      try {
+        const fd = new FormData();
+        fd.append("image", imgIn);
+        fd.append("audio", audIn);
+        fd.append(
+          "data_json",
+          new Blob([JSON.stringify(buildScoreDataObject())], { type: "application/json" }),
+          "data.json"
+        );
+        const r = await fetch(origin.replace(/\/$/, "") + "/api/marker/stage", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token },
+          body: fd,
+          mode: "cors",
+          credentials: "omit",
+        });
+        const text = await r.text();
+        let j;
+        try {
+          j = JSON.parse(text);
+        } catch {
+          j = { raw: text };
+        }
+        if (!r.ok) {
+          const d = j.detail;
+          statusEl.textContent =
+            "预览失败（HTTP " + r.status + "）：" +
+            (typeof d === "string" ? d : JSON.stringify(d || j.raw || j));
+          return;
+        }
+        if (!j.session || !/^[a-f0-9]{32}$/.test(j.session)) {
+          statusEl.textContent = "预览返回异常：" + text.slice(0, 400);
+          return;
+        }
+        try {
+          sessionStorage.setItem(LS_MARKER_RESUME, j.session);
+        } catch (e) {
+          debug("sessionStorage resume id: " + (e && e.message ? e.message : String(e)));
+        }
+        localStorage.setItem("yuepu_marker_app_token", token);
+        localStorage.setItem("yuepu_viewer_app_token", token);
+        if (apiBaseMarker && (apiBaseMarker.value || "").trim()) {
+          localStorage.setItem("yuepu_marker_api_base", apiBaseMarker.value.trim().replace(/\/$/, ""));
+          localStorage.setItem("yuepu_viewer_api_base", apiBaseMarker.value.trim().replace(/\/$/, ""));
+        }
+        const base = origin.replace(/\/$/, "");
+        location.href = base + "/viewer/?markerSession=" + encodeURIComponent(j.session) + "&minimal=1";
+      } catch (err) {
+        statusEl.textContent = "预览请求异常：" + (err && err.message ? err.message : String(err));
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    };
+
+    const onPublishClick = async () => {
+      debug("click 上传到服务器(发布)");
+      const { imgIn, audIn, token, origin, songId } = readPublishForm();
+      if (!imgIn || !audIn) {
+        statusEl.textContent = "请先选择谱面图片和音频。";
+        return;
+      }
+      if (!songId) {
+        statusEl.textContent = "请填写歌曲名称（将用作服务器上曲包目录名）。";
+        return;
+      }
+      if (measures.length < 1) {
+        statusEl.textContent = "发布需要至少 1 个小节，请先完成双击打点。";
+        return;
+      }
+      if (!token) {
+        statusEl.textContent = "请填写 App Token。";
+        return;
+      }
+      if (!origin) {
+        statusEl.textContent = "请用 http(s) 打开本页并可访问后端，或填写「后端根地址」。";
+        return;
+      }
+      const btn = document.getElementById("btnUploadServer");
+      if (btn) btn.disabled = true;
+      setPreviewJson();
+
+      async function postPublish(overwriteFlag) {
+        const fd = new FormData();
+        fd.append("song_id", songId);
+        fd.append("title", document.getElementById("title").value.trim() || songId);
+        fd.append("image", imgIn);
+        fd.append("audio", audIn);
+        fd.append(
+          "data_json",
+          new Blob([JSON.stringify(buildScoreDataObject())], { type: "application/json" }),
+          "data.json"
+        );
+        fd.append("overwrite", overwriteFlag ? "true" : "false");
+        return fetch(origin.replace(/\/$/, "") + "/api/marker/publish", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token },
+          body: fd,
+          mode: "cors",
+          credentials: "omit",
+        });
+      }
+
+      try {
+        let overwrite = false;
+        statusEl.textContent = "正在检查是否与已有曲包重名…";
+        const listUrl = origin.replace(/\/$/, "") + "/api/scores?ready=false";
+        const lr = await fetch(listUrl, {
+          headers: { Authorization: "Bearer " + token },
+          credentials: "omit",
+          cache: "no-store",
+        });
+        if (!lr.ok) {
+          const tx = await lr.text();
+          statusEl.textContent =
+            "无法拉取曲库列表以检查重名（HTTP " + lr.status + "）：" + tx.slice(0, 200);
+          return;
+        }
+        const lj = await lr.json();
+        const scores = lj.scores || [];
+        const exists = scores.some(
+          (s) => (s.folderId || "") === songId || (s.songId || "") === songId
+        );
+        if (exists) {
+          const ok = window.confirm(
+            "服务器上已存在同名曲包目录「" +
+              songId +
+              "」。\n\n" +
+              "· 确定：删除该套旧资源并以当前编辑内容覆盖发布。\n" +
+              "· 取消：不发布（可修改「歌曲名称」后重试）。"
+          );
+          if (!ok) {
+            statusEl.textContent = "已取消发布。";
+            return;
+          }
+          overwrite = true;
+        }
+
+        statusEl.textContent = "正在发布曲包到服务器…";
+        let r = await postPublish(overwrite);
+        let text = await r.text();
+        let j;
+        try {
+          j = JSON.parse(text);
+        } catch {
+          j = { raw: text };
+        }
+        if (!r.ok && r.status === 409 && !overwrite) {
+          const ok2 = window.confirm(
+            "服务器提示该目录下已有曲包（例如在其它窗口刚发布）。是否覆盖发布？"
+          );
+          if (ok2) {
+            overwrite = true;
+            r = await postPublish(true);
+            text = await r.text();
+            try {
+              j = JSON.parse(text);
+            } catch {
+              j = { raw: text };
+            }
+          }
+        }
+        if (!r.ok) {
+          const d = j.detail;
+          statusEl.textContent =
+            "发布失败（HTTP " + r.status + "）：" +
+            (typeof d === "string" ? d : JSON.stringify(d || j.raw || j));
+          return;
+        }
+        localStorage.setItem("yuepu_marker_app_token", token);
+        localStorage.setItem("yuepu_viewer_app_token", token);
+        if (apiBaseMarker && (apiBaseMarker.value || "").trim()) {
+          localStorage.setItem("yuepu_marker_api_base", apiBaseMarker.value.trim().replace(/\/$/, ""));
+          localStorage.setItem("yuepu_viewer_api_base", apiBaseMarker.value.trim().replace(/\/$/, ""));
+        }
+        statusEl.textContent =
+          "已发布。曲包目录：" +
+          (j.songId || songId) +
+          "。可在首页点击卡片阅览（若未出现请先点刷新列表）。";
+      } catch (err) {
+        statusEl.textContent = "发布请求异常：" + (err && err.message ? err.message : String(err));
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    };
+
+    window.markerPreviewClick = onPreviewClick;
+    window.markerPublishClick = onPublishClick;
+    (function bindMarkerPrimaryButtons() {
+      const bp = document.getElementById("btnPreview");
+      const bu = document.getElementById("btnUploadServer");
+      if (bp) bp.onclick = onPreviewClick;
+      if (bu) bu.onclick = onPublishClick;
+    })();
+
+    const btnUndo = document.getElementById("btnUndo");
+    if (btnUndo) btnUndo.onclick = () => {
+      if (pendingDblStart) {
+        pendingDblStart = null;
+        if (audio) audio.pause();
+        redraw();
+        statusEl.textContent = "已取消当前未完成的起点标记";
+        return;
+      }
+      if (!measures.length) {
+        statusEl.textContent = "没有可撤销的小节";
+        return;
+      }
+      const popped = measures[measures.length - 1];
+      try {
+        measureRedoStack.push(JSON.parse(JSON.stringify(popped)));
+      } catch (e) {
+        measureRedoStack.push(popped);
+      }
+      measures.pop();
+      const prev = measures[measures.length - 1];
+      if (audio) {
+        if (prev) {
+          audio.currentTime = prev.endTimeMs / 1000;
+        } else {
+          audio.currentTime = 0;
+        }
+      }
+      redraw();
+      updatePreviewPlayhead();
+      statusEl.textContent = prev
+        ? "已撤销上一小节，播放头已移至小节 " + prev.id + " 终点（" + prev.endTimeMs + " ms）"
+        : "已撤销第一小节，播放头已移至开头";
+    };
+
+    const btnRedoUndo = document.getElementById("btnRedoUndo");
+    if (btnRedoUndo) {
+      btnRedoUndo.onclick = () => {
+        if (!measureRedoStack.length) {
+          statusEl.textContent = "没有可恢复的撤销（仅「撤销上一小节」会被记入）";
+          return;
+        }
+        const m = measureRedoStack.pop();
+        if (!m || typeof m.id !== "number") {
+          statusEl.textContent = "恢复数据异常，请重试。";
+          return;
+        }
+        measures.push(m);
+        lastMeasuresPreviewSig = "";
+        refreshAnnotationPreview();
+        redraw();
+        updatePreviewPlayhead();
+        if (audio) {
+          let t = m.endTimeMs / 1000;
+          if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
+            t = Math.min(t, Math.max(0, audio.duration - 0.04));
+          }
+          try {
+            audio.currentTime = t;
+          } catch (e) {
+            /* ignore */
+          }
+        }
+        statusEl.textContent =
+          "已恢复小节 " + m.id + "（误撤销可用本按钮回退）。播放头已在略小于该小节末尾处。";
+      };
+    }
+
+    const btnResetBox = document.getElementById("btnResetBoxHeight");
+    if (btnResetBox) btnResetBox.onclick = () => {
+      if (measures.length > 0) {
+        statusEl.textContent = "请先撤销全部小节后，再重设框高。";
+        return;
+      }
+      sessionBoxHeight = null;
+      heightLineRef = null;
+      pendingDblStart = null;
+      heightTwoClickFirst = null;
+      clearHeightClickTimers();
+      measureRedoStack = [];
+      lastMeasuresPreviewSig = "";
+      refreshAnnotationPreview();
+      redraw();
+      statusEl.textContent = "框高已清除，请再次在谱面上单击两点定竖线。";
+    };
+
+    const btnExport = document.getElementById("btnExport");
+    if (btnExport) btnExport.onclick = () => {
+      const songId = document.getElementById("songId").value.trim() || "demo_song";
+      const title = document.getElementById("title").value.trim() || songId;
+      const obj = {
+        songId,
+        title,
+        imageFile: "sheet.jpg",
+        audioFile: exportAudioFileName(),
+        measures,
+      };
+      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "data.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+
+    const songIdInput = document.getElementById("songId");
+    const titleInput = document.getElementById("title");
+    if (songIdInput) songIdInput.addEventListener("input", updatePreview);
+    if (titleInput) titleInput.addEventListener("input", updatePreview);
+
+    document.getElementById("previewShowLabels")?.addEventListener("change", () => redraw());
+    document.getElementById("previewHighlightCurrent")?.addEventListener("change", () => {
+      updatePreviewPlayhead();
+      redraw();
+    });
+
+    audio.addEventListener("timeupdate", () => {
+      updatePreviewPlayhead();
+      const hel = document.getElementById("previewHighlightCurrent");
+      if (hel && hel.checked && ctx && naturalW) redraw();
+    });
+    audio.addEventListener("loadedmetadata", () => {
+      lastMeasuresPreviewSig = "";
+      refreshAnnotationPreview();
+    });
+
+    (function bindPreviewTimelineScrub() {
+      const bar = document.getElementById("previewTimeline");
+      if (!bar || bar.dataset.markerBound) return;
+      bar.dataset.markerBound = "1";
+      bar.addEventListener("click", (e) => {
+        if (e.target.classList.contains("preview-segment")) return;
+        if (!audio) return;
+        const rect = bar.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const ratio = rect.width > 0 ? Math.max(0, Math.min(1, x / rect.width)) : 0;
+        const durMs = getPreviewDurationMs();
+        let tSec = (durMs * ratio) / 1000;
+        if (audio.duration && isFinite(audio.duration)) {
+          tSec = Math.max(0, Math.min(tSec, audio.duration));
+        }
+        audio.currentTime = tSec;
+        updatePreviewPlayhead();
+        redraw();
+      });
+    })();
+
+    (function bindQupumaoModal() {
+      const overlay = document.getElementById("qupumaoModal");
+      const btnOpen = document.getElementById("btnQupumaoSearch");
+      const qIn = document.getElementById("qupumaoQuery");
+      const qStatus = document.getElementById("qupumaoStatus");
+      const qList = document.getElementById("qupumaoResults");
+      const imgIn = document.getElementById("imgFile");
+      const lb = document.getElementById("qupumaoPreviewLightbox");
+      const lbBackdrop = document.getElementById("qupumaoLightboxBackdrop");
+      const lbImg = document.getElementById("qupumaoLightboxImg");
+      const lbCap = document.getElementById("qupumaoLightboxCaption");
+      const lbClose = document.getElementById("qupumaoLightboxClose");
+      if (!overlay || !btnOpen || !qList || !lb || !lbImg || !lbCap) return;
+      let pickedPath = null;
+      let cachedPreviewBlob = null;
+      let cachedPreviewPath = null;
+      let qupumaoSessionCache = [];
+
+      function escapeHtml(s) {
+        const d = document.createElement("div");
+        d.textContent = s;
+        return d.innerHTML;
+      }
+
+      function closeLightbox() {
+        if (!lb) return;
+        lb.classList.remove("is-open");
+        lb.setAttribute("aria-hidden", "true");
+        if (lbImg) lbImg.removeAttribute("src");
+        if (lbCap) lbCap.textContent = "";
+      }
+
+      function openLightbox(item) {
+        if (!lb || !lbImg || !lbCap) return;
+        lbImg.src = item.thumbUrl;
+        lbCap.textContent = item.title;
+        lbImg.onerror = () => {
+          qStatus.textContent = "大图预览加载失败。";
+          closeLightbox();
+        };
+        lb.classList.add("is-open");
+        lb.setAttribute("aria-hidden", "false");
+      }
+
+      function revokeAllQupumaoSession() {
+        closeLightbox();
+        qupumaoSessionCache.forEach((c) => {
+          if (c.thumbUrl) {
+            try {
+              URL.revokeObjectURL(c.thumbUrl);
+            } catch (err) {
+              /* ignore */
+            }
+          }
+        });
+        qupumaoSessionCache = [];
+        pickedPath = null;
+        cachedPreviewBlob = null;
+        cachedPreviewPath = null;
+        if (qList) qList.innerHTML = "";
+      }
+
+      function openModal() {
+        overlay.classList.add("is-open");
+        overlay.setAttribute("aria-hidden", "false");
+        if (qIn && !qIn.value.trim()) {
+          const sid = document.getElementById("songId");
+          if (sid && sid.value.trim()) qIn.value = sid.value.trim();
+        }
+        qStatus.textContent = "";
+      }
+      function closeModal() {
+        overlay.classList.remove("is-open");
+        overlay.setAttribute("aria-hidden", "true");
+        revokeAllQupumaoSession();
+      }
+      btnOpen.addEventListener("click", openModal);
+      document.getElementById("qupumaoClose").addEventListener("click", closeModal);
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) closeModal();
+      });
+      if (lbBackdrop) {
+        lbBackdrop.addEventListener("click", () => closeLightbox());
+      }
+      if (lbClose) {
+        lbClose.addEventListener("click", () => closeLightbox());
+      }
+      document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        if (!lb || !lb.classList.contains("is-open")) return;
+        e.preventDefault();
+        closeLightbox();
+      });
+
+      async function fetchQupumaoSheetBlob(path) {
+        const origin = getMarkerApiBase();
+        const token = appTokenMarker ? (appTokenMarker.value || "").trim() : "";
+        const r = await fetch(origin.replace(/\/$/, "") + "/api/marker/qupumao/download", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + token,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ path: path }),
+          credentials: "omit",
+          cache: "no-store",
+        });
+        if (!r.ok) {
+          const t = await r.text();
+          throw new Error("HTTP " + r.status + " " + t.slice(0, 200));
+        }
+        return r.blob();
+      }
+
+      function selectRow(i) {
+        const item = qupumaoSessionCache[i];
+        if (!item || item.error || !item.blob || !item.thumbUrl) return;
+        pickedPath = item.path;
+        cachedPreviewBlob = item.blob;
+        cachedPreviewPath = item.path;
+        qList.querySelectorAll("li").forEach((c) => c.classList.remove("is-picked"));
+        const row = qList.querySelector('[data-index="' + i + '"]');
+        if (row) row.classList.add("is-picked");
+        openLightbox(item);
+        qStatus.textContent = "已选中：" + item.title + " · 可点「下载乐谱」载入编辑区。";
+      }
+
+      async function prefetchAndRenderList(results) {
+        const cache = results.map((r) => ({
+          path: r.path,
+          title: r.title || r.path,
+          blob: null,
+          thumbUrl: null,
+          error: false,
+        }));
+        qupumaoSessionCache = cache;
+        qList.innerHTML = "";
+        const n = cache.length;
+        let done = 0;
+        let nextIdx = 0;
+        const CONC = 3;
+
+        cache.forEach((c, i) => {
+          const li = document.createElement("li");
+          li.dataset.index = String(i);
+          li.className = "qupumao-row-wait";
+          li.innerHTML =
+            '<span class="qupumao-row-status">···</span><span class="qupumao-row-title">' +
+            escapeHtml(c.title) +
+            "</span>";
+          li.addEventListener("click", () => {
+            if (cache[i].error) {
+              qStatus.textContent = "该条谱图加载失败。";
+              return;
+            }
+            if (!cache[i].blob) {
+              qStatus.textContent = "该条仍在缓存中，请稍候…";
+              return;
+            }
+            selectRow(i);
+          });
+          qList.appendChild(li);
+        });
+
+        async function worker() {
+          while (true) {
+            const i = nextIdx++;
+            if (i >= n) break;
+            qStatus.textContent = "正在缓存谱图 " + Math.min(done + 1, n) + " / " + n + " …";
+            try {
+              const blob = await fetchQupumaoSheetBlob(cache[i].path);
+              cache[i].blob = blob;
+              cache[i].thumbUrl = URL.createObjectURL(blob);
+            } catch (e) {
+              cache[i].error = true;
+            }
+            done++;
+            const el = qList.querySelector('[data-index="' + i + '"]');
+            if (el) {
+              const st = el.querySelector(".qupumao-row-status");
+              el.classList.remove("qupumao-row-wait");
+              if (cache[i].error) {
+                el.classList.add("qupumao-row-fail");
+                if (st) st.textContent = "—";
+              } else if (st) {
+                st.textContent = "✓";
+              }
+            }
+            qStatus.textContent = "已缓存 " + done + " / " + n + " 条…";
+          }
+        }
+
+        const nw = Math.min(CONC, n);
+        await Promise.all(Array.from({ length: nw }, () => worker()));
+        qStatus.textContent =
+          "共 " + n + " 条已缓存，点击列表中的标题弹出大图预览；确认后点「下载乐谱」载入打点区。";
+      }
+
+      async function doSearch() {
+        const origin = getMarkerApiBase();
+        const token = appTokenMarker ? (appTokenMarker.value || "").trim() : "";
+        if (!origin) {
+          qStatus.textContent = "请用 http(s) 打开本页或填写「后端根地址」。";
+          return;
+        }
+        if (!token) {
+          qStatus.textContent = "请填写 App Token（与 APP_TOKEN 一致）。";
+          return;
+        }
+        const q = qIn ? (qIn.value || "").trim() : "";
+        if (!q) {
+          qStatus.textContent = "请输入要搜索的歌曲名称。";
+          return;
+        }
+        qStatus.textContent = "正在搜索…";
+        revokeAllQupumaoSession();
+        try {
+          const u =
+            origin.replace(/\/$/, "") +
+            "/api/marker/qupumao/search?q=" +
+            encodeURIComponent(q);
+          const r = await fetch(u, {
+            headers: { Authorization: "Bearer " + token },
+            credentials: "omit",
+            cache: "no-store",
+          });
+          const txt = await r.text();
+          if (!r.ok) {
+            qStatus.textContent = "搜索失败 HTTP " + r.status + " " + txt.slice(0, 200);
+            return;
+          }
+          const j = JSON.parse(txt);
+          const results = j.results || [];
+          if (!results.length) {
+            qStatus.textContent = "未找到结果，请换关键词。";
+            return;
+          }
+          await prefetchAndRenderList(results);
+        } catch (err) {
+          revokeAllQupumaoSession();
+          qStatus.textContent = "搜索失败：" + (err && err.message ? err.message : String(err));
+        }
+      }
+      document.getElementById("qupumaoDoSearch").addEventListener("click", doSearch);
+
+      async function doDownload() {
+        if (!pickedPath) {
+          qStatus.textContent = "请先在列表中点击一条结果（将弹出大图），再点「下载乐谱」。";
+          return;
+        }
+        const origin = getMarkerApiBase();
+        const token = appTokenMarker ? (appTokenMarker.value || "").trim() : "";
+        if (!origin || !token) {
+          qStatus.textContent = "需要后端地址与 App Token。";
+          return;
+        }
+        if (!imgIn) return;
+        qStatus.textContent = "正在载入谱图…";
+        try {
+          let blob;
+          let mime = "image/jpeg";
+          if (cachedPreviewBlob && cachedPreviewPath === pickedPath) {
+            blob = cachedPreviewBlob;
+            mime = blob.type || mime;
+          } else {
+            const r = await fetch(origin.replace(/\/$/, "") + "/api/marker/qupumao/download", {
+              method: "POST",
+              headers: {
+                Authorization: "Bearer " + token,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ path: pickedPath }),
+              credentials: "omit",
+              cache: "no-store",
+            });
+            if (!r.ok) {
+              const t = await r.text();
+              qStatus.textContent = "下载失败 HTTP " + r.status + " " + t.slice(0, 200);
+              return;
+            }
+            blob = await r.blob();
+            mime = r.headers.get("content-type") || blob.type || mime;
+          }
+          const file = new File([blob], "qupumao_sheet.jpg", { type: mime });
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          imgIn.files = dt.files;
+          const el = document.getElementById("imgFileLabel");
+          if (el) el.textContent = file.name + "（来自网络）";
+          imgIn.dispatchEvent(new Event("change", { bubbles: true }));
+          qStatus.textContent = "谱图已载入本页。";
+          closeModal();
+        } catch (err) {
+          qStatus.textContent = "下载失败：" + (err && err.message ? err.message : String(err));
+        }
+      }
+      document.getElementById("qupumaoDownload").addEventListener("click", doDownload);
+    })();
+
+    (async function bootMarkerPage() {
+      try {
+        const q = new URLSearchParams(location.search);
+        if (q.get("resumePreview") === "1") {
+          const sid = sessionStorage.getItem(LS_MARKER_RESUME);
+          if (sid && /^[a-f0-9]{32}$/.test(sid)) {
+            await restoreMarkerFromStageSession(sid);
+            sessionStorage.removeItem(LS_MARKER_RESUME);
+          }
+          history.replaceState({}, "", location.pathname + location.hash);
+        }
+      } catch (e) {
+        if (statusEl) {
+          statusEl.textContent =
+            "恢复预览前编辑现场失败：" + (e && e.message ? e.message : String(e));
+        }
+        history.replaceState({}, "", location.pathname + location.hash);
+      }
+      setPreviewJson();
+      lastMeasuresPreviewSig = "";
+      refreshAnnotationPreview();
+    })();
+  </script>
+</body>
+</html>
