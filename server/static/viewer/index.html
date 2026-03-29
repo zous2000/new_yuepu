@@ -37,16 +37,17 @@
     .sheet-stack {
       position: relative;
       display: inline-block;
-      max-width: 100%;
+      max-width: none;
       line-height: 0;
     }
     #sheet {
       display: block;
       width: auto;
-      max-width: 100%;
-      max-height: calc(100vh - var(--viewer-chrome-h) - 16px);
       height: auto;
+      max-width: none;
+      max-height: none;
       object-fit: contain;
+      vertical-align: top;
     }
     #overlay {
       position: absolute;
@@ -179,6 +180,9 @@
       border-color: #5c6bc0;
       color: #fff;
     }
+    .speed-btns button#btnZoomFollow.zoom-follow-on {
+      color: #90caf9;
+    }
   </style>
 </head>
 <body>
@@ -223,11 +227,21 @@
         </div>
       </div>
       <audio id="player" controls preload="metadata" playsinline style="width:100%;margin-top:0.75rem;"></audio>
+      <div class="speed-bar" id="zoomBar">
+        <span class="speed-label">谱图缩放</span>
+        <div class="speed-btns">
+          <button type="button" id="btnZoomOut" title="缩小">−</button>
+          <button type="button" id="btnZoomIn" title="放大">+</button>
+          <button type="button" id="btnZoomFit" title="以窗口为基准重新适应">适应窗口</button>
+          <span class="speed-label" id="zoomLabel" style="margin:0;min-width:2.75rem;text-align:center;">100%</span>
+          <button type="button" id="btnZoomFollow" title="开：200% 缩放并随播放小节居中；关：取消跟随并恢复适应窗口">缩放跟随</button>
+        </div>
+      </div>
       <div class="speed-bar" id="speedBar">
         <span class="speed-label">倍速</span>
         <div class="speed-btns" id="speedBtns"></div>
       </div>
-      <p class="meta" style="margin-top:0.5rem;">谱图按视口缩小显示以尽量一屏看全（仍可滚动）。<strong>点击谱图</strong>播放/暂停。仅当前小节显示进度框与卡拉 OK 蒙层；不显示小节序号。</p>
+      <p class="meta" style="margin-top:0.5rem;">默认在窗口内完整显示谱图；点<strong>「缩放跟随」</strong>可 200% 缩放并在播放时自动将当前小节滚到视口中央（再点一次关闭跟随并恢复适应窗口）。谱面区域可横向、纵向滚动。<strong>点击谱图</strong>播放/暂停。仅当前小节显示进度框与卡拉 OK 蒙层；不显示小节序号。</p>
       <p class="minimal-bottom-link"><a href="#" id="linkFullViewer">完整设置界面</a></p>
     </div>
   </div>
@@ -235,6 +249,20 @@
   <script>
     const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
     const LS_RATE = "yuepu_viewer_playback_rate";
+    const LS_ZOOM = "yuepu_viewer_sheet_zoom";
+    const ZOOM_STEP = 1.2;
+
+    function clampSheetZoom(z) {
+      if (!isFinite(z) || z < 0.5) return 0.5;
+      if (z > 4) return 4;
+      return z;
+    }
+
+    let sheetUserZoom = clampSheetZoom(parseFloat(localStorage.getItem(LS_ZOOM) || "1"));
+
+    const LS_FOLLOW = "yuepu_viewer_follow_measure_center";
+    let followActiveMeasureEnabled = localStorage.getItem(LS_FOLLOW) === "1";
+    let lastFollowMeasureKey = null;
 
     const qs = new URLSearchParams(location.search);
     const minimalMode = qs.get("minimal") === "1" || qs.get("m") === "1";
@@ -427,6 +455,92 @@
       drawOverlay();
     }
 
+    function updateZoomLabel() {
+      const el = document.getElementById("zoomLabel");
+      if (el) el.textContent = Math.round(sheetUserZoom * 100) + "%";
+    }
+
+    function updateZoomFollowButtonUI() {
+      const btn = document.getElementById("btnZoomFollow");
+      if (btn) btn.classList.toggle("zoom-follow-on", followActiveMeasureEnabled);
+    }
+
+    /** 在 #wrap 可视区域内「适应」整张谱图，再乘以 sheetUserZoom；避免用 CSS transform，以便 overlay 与像素对齐 */
+    function applySheetLayout() {
+      if (!naturalW || !naturalH) return;
+      const pad = 8;
+      const availW = Math.max(40, wrap.clientWidth - pad);
+      const availH = Math.max(60, wrap.clientHeight - pad);
+      const fitW = availW / naturalW;
+      const fitH = availH / naturalH;
+      const baseFit = Math.min(fitW, fitH);
+      const scale = baseFit * sheetUserZoom;
+      const dw = Math.max(1, Math.floor(naturalW * scale));
+      sheet.style.width = dw + "px";
+      sheet.style.height = "auto";
+      sheet.style.maxWidth = "none";
+      sheet.style.maxHeight = "none";
+      syncOverlay();
+      updateZoomLabel();
+    }
+
+    /** @param {{ m: object, i: number } | null} hit */
+    function measureStableKey(hit) {
+      if (!hit) return "__none__";
+      const m = hit.m;
+      const i = hit.i;
+      if (m && m.id != null && String(m.id) !== "") return "id:" + m.id;
+      return "i:" + i;
+    }
+
+    /** @returns {{ m: object, i: number } | null} */
+    function findActiveMeasureAt(tMs) {
+      if (!scoreData || !scoreData.measures) return null;
+      const measures = scoreData.measures;
+      for (let i = 0; i < measures.length; i++) {
+        const m = measures[i];
+        if (tMs >= m.startTimeMs && tMs < m.endTimeMs) return { m, i };
+      }
+      return null;
+    }
+
+    /** 将当前播放时间所在小节的中心点对齐到 #wrap 视口中心（依赖 getBoundingClientRect，须在布局完成后调用） */
+    function scrollActiveMeasureToCenter() {
+      if (!naturalW || !naturalH || !wrap || !sheet) return;
+      const tMs = (player && isFinite(player.currentTime) ? player.currentTime : 0) * 1000;
+      const hit = findActiveMeasureAt(tMs);
+      if (!hit) return;
+      const m = hit.m;
+
+      const sr = sheet.getBoundingClientRect();
+      const wr = wrap.getBoundingClientRect();
+      if (sr.width < 2 || sr.height < 2 || wr.width < 2 || wr.height < 2) return;
+
+      const scaleX = sr.width / naturalW;
+      const scaleY = sr.height / naturalH;
+      const cx = (m.rect.x + m.rect.w / 2) * scaleX;
+      const cy = (m.rect.y + m.rect.h / 2) * scaleY;
+      const cxScreen = sr.left + cx;
+      const cyScreen = sr.top + cy;
+
+      const targetX = wr.left + wr.width / 2;
+      const targetY = wr.top + wr.height / 2;
+
+      wrap.scrollLeft += cxScreen - targetX;
+      wrap.scrollTop += cyScreen - targetY;
+    }
+
+    function maybeFollowActiveMeasure() {
+      if (!followActiveMeasureEnabled || !scoreData) return;
+      if (!player || player.paused || player.ended) return;
+      const tMs = (isFinite(player.currentTime) ? player.currentTime : 0) * 1000;
+      const hit = findActiveMeasureAt(tMs);
+      const key = measureStableKey(hit);
+      if (key === lastFollowMeasureKey) return;
+      lastFollowMeasureKey = key;
+      if (hit) requestAnimationFrame(() => scrollActiveMeasureToCenter());
+    }
+
     function drawOverlay() {
       if (!ctx || !scoreData || !naturalW || !naturalH) return;
       const w = overlay.width;
@@ -469,6 +583,8 @@
         ctx.lineWidth = 3;
         ctx.strokeRect(x, y, rw, rh);
       });
+
+      maybeFollowActiveMeasure();
     }
 
     async function openScore(folderId) {
@@ -500,6 +616,7 @@
       player.load();
       naturalW = 0;
       naturalH = 0;
+      lastFollowMeasureKey = null;
 
       try {
         const dataRes = await fetchAuthorized("/api/scores/" + encodeURIComponent(fid) + "/data.json");
@@ -522,7 +639,11 @@
           naturalW = sheet.naturalWidth;
           naturalH = sheet.naturalHeight;
           overlayAttempts = 0;
-          syncOverlay();
+          applySheetLayout();
+          requestAnimationFrame(() => {
+            applySheetLayout();
+            if (followActiveMeasureEnabled) scrollActiveMeasureToCenter();
+          });
         };
         sheet.onerror = () => {
           statusEl.textContent = "谱面图解码失败。";
@@ -562,6 +683,7 @@
       player.load();
       naturalW = 0;
       naturalH = 0;
+      lastFollowMeasureKey = null;
       document.body.classList.add("viewer-from-marker");
       try {
         const dataUrl = absPath("/api/marker/asset/" + encodeURIComponent(sess) + "/data.json");
@@ -589,7 +711,11 @@
           naturalW = sheet.naturalWidth;
           naturalH = sheet.naturalHeight;
           overlayAttempts = 0;
-          syncOverlay();
+          applySheetLayout();
+          requestAnimationFrame(() => {
+            applySheetLayout();
+            if (followActiveMeasureEnabled) scrollActiveMeasureToCenter();
+          });
         };
         sheet.onerror = () => {
           statusEl.textContent = "谱面图解码失败。";
@@ -659,13 +785,71 @@
       openScore(document.getElementById("manualId").value);
     };
 
+    document.getElementById("btnZoomOut").addEventListener("click", () => {
+      sheetUserZoom = clampSheetZoom(sheetUserZoom / ZOOM_STEP);
+      localStorage.setItem(LS_ZOOM, String(sheetUserZoom));
+      if (naturalW) applySheetLayout();
+      else updateZoomLabel();
+    });
+    document.getElementById("btnZoomIn").addEventListener("click", () => {
+      sheetUserZoom = clampSheetZoom(sheetUserZoom * ZOOM_STEP);
+      localStorage.setItem(LS_ZOOM, String(sheetUserZoom));
+      if (naturalW) applySheetLayout();
+      else updateZoomLabel();
+    });
+    document.getElementById("btnZoomFit").addEventListener("click", () => {
+      sheetUserZoom = 1;
+      localStorage.setItem(LS_ZOOM, "1");
+      if (naturalW) applySheetLayout();
+      else updateZoomLabel();
+    });
+
+    document.getElementById("btnZoomFollow").addEventListener("click", () => {
+      if (followActiveMeasureEnabled) {
+        followActiveMeasureEnabled = false;
+        localStorage.setItem(LS_FOLLOW, "0");
+        sheetUserZoom = 1;
+        localStorage.setItem(LS_ZOOM, "1");
+        lastFollowMeasureKey = null;
+        updateZoomFollowButtonUI();
+        if (naturalW) applySheetLayout();
+        else updateZoomLabel();
+      } else {
+        sheetUserZoom = clampSheetZoom(2);
+        localStorage.setItem(LS_ZOOM, String(sheetUserZoom));
+        followActiveMeasureEnabled = true;
+        localStorage.setItem(LS_FOLLOW, "1");
+        lastFollowMeasureKey = null;
+        updateZoomFollowButtonUI();
+        if (naturalW) {
+          applySheetLayout();
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => scrollActiveMeasureToCenter());
+          });
+        } else {
+          updateZoomLabel();
+        }
+      }
+    });
+
+    updateZoomLabel();
+    updateZoomFollowButtonUI();
+
     window.addEventListener("resize", () => {
-      if (naturalW) syncOverlay();
+      if (!naturalW) return;
+      applySheetLayout();
+      if (followActiveMeasureEnabled) {
+        requestAnimationFrame(() => scrollActiveMeasureToCenter());
+      }
     });
 
     player.addEventListener("timeupdate", () => drawOverlay());
     player.addEventListener("seeked", () => {
+      lastFollowMeasureKey = null;
       drawOverlay();
+      if (followActiveMeasureEnabled) {
+        requestAnimationFrame(() => scrollActiveMeasureToCenter());
+      }
       if (!player.paused) scheduleOverlayLoop();
     });
     player.addEventListener("play", () => scheduleOverlayLoop());
