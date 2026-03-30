@@ -9,6 +9,9 @@
   LOCAL_SCORES_DIR=.../server/data/scores  （默认为本仓库下该路径）
   REMOTE_SCORES_DIR=/opt/new_yuepu/server/data/scores
 
+说明：remote_aliyun_deploy.py 已改为原地 git 更新，一般不会清空远端曲谱；本脚本用于把本机
+曲包一次性覆盖/合并到远端（按子目录名作曲目 id）。
+
 用法（在仓库根目录）:
   set ALIYUN_ROOT_PASSWORD=你的密码
   python server/scripts/sync_local_scores_to_ecs.py

@@ -1,5 +1,10 @@
 """
-从本机经 SSH 在阿里云 ECS 上：释放 8000、停 Docker（若有）、克隆 new_yuepu 并以 systemd 运行 uvicorn。
+从本机经 SSH 在阿里云 ECS 上：释放 8000、停 Docker（若有）、更新代码并以 systemd 运行 uvicorn。
+
+- 已有 /opt/new_yuepu 且为 Git 仓库：git fetch + reset --hard，不删目录；
+  server/data/scores 在 .gitignore 中，不会被 reset 清空。
+- 目录存在但非 Git：先备份 server/data/scores，再删除并 clone，最后拷回曲谱。
+- 首次部署：直接 shallow clone。
 
 用法:
   set ALIYUN_ROOT_PASSWORD=你的密码
@@ -67,12 +72,32 @@ def build_remote_script() -> str:
         fi
 
         systemctl stop yuepu-server 2>/dev/null || true
-        systemctl disable yuepu-server 2>/dev/null || true
 
-        rm -rf "{DEPLOY_DIR}"
-        git clone --depth 1 "{REPO}" "{DEPLOY_DIR}"
+        if [ -d "{DEPLOY_DIR}/.git" ]; then
+          cd "{DEPLOY_DIR}"
+          git remote set-url origin "{REPO}" || true
+          git fetch --depth 1 origin main
+          git checkout -f main
+          git reset --hard FETCH_HEAD
+        elif [ -d "{DEPLOY_DIR}" ]; then
+          BACKUP_DIR=$(mktemp -d)
+          if [ -d "{DEPLOY_DIR}/server/data/scores" ]; then
+            cp -a "{DEPLOY_DIR}/server/data/scores/." "$BACKUP_DIR/" || true
+          fi
+          rm -rf "{DEPLOY_DIR}"
+          git clone --depth 1 "{REPO}" "{DEPLOY_DIR}"
+          mkdir -p "{DEPLOY_DIR}/server/data/scores"
+          cp -a "$BACKUP_DIR/." "{DEPLOY_DIR}/server/data/scores/" 2>/dev/null || true
+          rm -rf "$BACKUP_DIR"
+        else
+          mkdir -p "$(dirname "{DEPLOY_DIR}")"
+          git clone --depth 1 "{REPO}" "{DEPLOY_DIR}"
+        fi
+
         cd "{DEPLOY_DIR}/server"
-        python3 -m venv .venv
+        if [ ! -d .venv ]; then
+          python3 -m venv .venv
+        fi
         .venv/bin/pip install -U pip -q
         .venv/bin/pip install -r requirements.txt -q
 
