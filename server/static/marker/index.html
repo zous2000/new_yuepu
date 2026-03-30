@@ -731,7 +731,9 @@
     }
 
     function buildScoreDataObject() {
-      const songId = document.getElementById("songId").value.trim() || "demo_song";
+      const sidRaw = document.getElementById("songId").value.trim();
+      // 预览/导出用占位，避免与「未填写却发布成 demo_song」混淆；真正发布以 #songId 必填为准
+      const songId = sidRaw || "未命名";
       const title = document.getElementById("title").value.trim() || songId;
       const imageFile = "sheet.jpg";
       const audioFile = exportAudioFileName();
@@ -1687,14 +1689,21 @@
         }
         const lj = await lr.json();
         const scores = lj.scores || [];
-        const exists = scores.some(
+        const hit = scores.find(
           (s) => (s.folderId || "") === songId || (s.songId || "") === songId
         );
-        if (exists) {
+        if (hit) {
+          const mc = hit.measureCount != null ? Number(hit.measureCount) : NaN;
+          const ghostTip =
+            !isFinite(mc) || mc < 1
+              ? "\n\n说明：该目录可能来自上次未完成的发布；这类曲包不会出现在首页（首页只显示已打点且音视频齐全的曲目），但仍会占用目录名。"
+              : "";
           const ok = window.confirm(
             "服务器上已存在同名曲包目录「" +
               songId +
-              "」。\n\n" +
+              "」（判定依据是**目录名/歌曲名称输入框**，与歌名显示无关）。" +
+              ghostTip +
+              "\n\n" +
               "· 确定：删除该套旧资源并以当前编辑内容覆盖发布。\n" +
               "· 取消：不发布（可修改「歌曲名称」后重试）。"
           );
@@ -1850,7 +1859,8 @@
 
     const btnExport = document.getElementById("btnExport");
     if (btnExport) btnExport.onclick = () => {
-      const songId = document.getElementById("songId").value.trim() || "demo_song";
+      const sidRaw = document.getElementById("songId").value.trim();
+      const songId = sidRaw || "未命名";
       const title = document.getElementById("title").value.trim() || songId;
       const obj = {
         songId,
