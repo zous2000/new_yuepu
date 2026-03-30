@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>乐谱阅览 — 已发布标注</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; background: #121212; color: #eee; }
@@ -161,7 +161,8 @@
     }
     body.viewer-tip .viewer-chrome,
     body.viewer-tip .panel-side,
-    body.viewer-tip .minimal-bottom-link {
+    body.viewer-tip .minimal-bottom-link,
+    body.viewer-tip .minimal-topbar {
       display: none !important;
     }
     body.viewer-tip .row {
@@ -289,6 +290,63 @@
       height: 20px;
       display: block;
     }
+
+    /* 浏览器地址栏无法由网页消除，仅在用户手势下 requestFullscreen 成功后隐藏 */
+    .tip-fullscreen-gate {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 100050;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom))
+        max(16px, env(safe-area-inset-left));
+      box-sizing: border-box;
+      background: rgba(0, 0, 0, 0.93);
+    }
+    .tip-fullscreen-gate.tip-fullscreen-gate--show {
+      display: flex;
+    }
+    .tip-fullscreen-gate-inner {
+      max-width: 360px;
+      text-align: center;
+      color: #e3f2fd;
+    }
+    .tip-fullscreen-gate-title {
+      font-size: 1.08rem;
+      margin: 0 0 0.65rem;
+      font-weight: 600;
+    }
+    .tip-fullscreen-gate-desc {
+      font-size: 0.86rem;
+      line-height: 1.55;
+      margin: 0 0 1.15rem;
+      color: #90a4ae;
+    }
+    .tip-fullscreen-gate-btn {
+      width: 100%;
+      max-width: 280px;
+      margin: 0 auto 0.65rem;
+      padding: 0.72rem 1rem;
+      font-size: 1rem;
+      border-radius: 10px;
+      border: 0;
+      background: #1976d2;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .tip-fullscreen-gate-link {
+      background: transparent;
+      border: 0;
+      color: #78909c;
+      font-size: 0.84rem;
+      cursor: pointer;
+      text-decoration: underline;
+      font-family: inherit;
+      padding: 0.35rem;
+    }
     .tip-side-rate {
       color: #90caf9;
       font-size: 11px;
@@ -361,6 +419,14 @@
   </style>
 </head>
 <body>
+  <div id="tipFullscreenGate" class="tip-fullscreen-gate" aria-hidden="true" role="dialog" aria-labelledby="tipFullscreenGateTitle">
+    <div class="tip-fullscreen-gate-inner">
+      <p id="tipFullscreenGateTitle" class="tip-fullscreen-gate-title">进入浏览器全屏，隐藏地址栏与书签栏</p>
+      <p class="tip-fullscreen-gate-desc">自动打开无法获得全屏权限，请点下方按钮一次；全屏后仅显示谱面与歌词层控件。</p>
+      <button type="button" id="btnTipEnterBrowserFullscreen" class="tip-fullscreen-gate-btn">进入全屏</button>
+      <button type="button" id="btnTipGateExitHome" class="tip-fullscreen-gate-link">返回首页</button>
+    </div>
+  </div>
   <div class="minimal-topbar" id="minimalTopbar">
     <div class="minimal-topbar-left">
       <a href="/" class="btn-back">← 返回</a>
@@ -520,6 +586,9 @@
     const tipRateLabel = document.getElementById("tipRateLabel");
     const tipProgressRange = document.getElementById("tipProgressRange");
     const tipProgressText = document.getElementById("tipProgressText");
+    const tipFullscreenGate = document.getElementById("tipFullscreenGate");
+    const btnTipEnterBrowserFullscreen = document.getElementById("btnTipEnterBrowserFullscreen");
+    const btnTipGateExitHome = document.getElementById("btnTipGateExitHome");
 
     const LS_BASE = "yuepu_viewer_api_base";
     const LS_TOKEN = "yuepu_viewer_app_token";
@@ -724,6 +793,22 @@
       setPlaybackRate(SPEEDS[next]);
     }
 
+    function isDocumentFullscreen() {
+      return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+    }
+
+    function fullscreenApiAvailable() {
+      const el = document.documentElement;
+      return !!(el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen);
+    }
+
+    function updateTipFullscreenGate() {
+      if (!tipFullscreenGate) return;
+      const show = tipModeEnabled && fullscreenApiAvailable() && !isDocumentFullscreen();
+      tipFullscreenGate.classList.toggle("tip-fullscreen-gate--show", show);
+      tipFullscreenGate.setAttribute("aria-hidden", show ? "false" : "true");
+    }
+
     async function requestFullscreenSafe(el) {
       const target = el || document.documentElement;
       const req = target.requestFullscreen || target.webkitRequestFullscreen || target.msRequestFullscreen;
@@ -811,6 +896,7 @@
         applySheetLayout();
         if (followActiveMeasureEnabled) requestAnimationFrame(() => scrollActiveMeasureToCenter());
       }
+      requestAnimationFrame(() => updateTipFullscreenGate());
     }
 
     function exitTipMode() {
@@ -823,6 +909,7 @@
         applySheetLayout();
         if (followActiveMeasureEnabled) requestAnimationFrame(() => scrollActiveMeasureToCenter());
       }
+      updateTipFullscreenGate();
     }
 
     /** 在 #wrap 可视区域内「适应」整张谱图，再乘以 sheetUserZoom；避免用 CSS transform，以便 overlay 与像素对齐 */
@@ -1286,17 +1373,35 @@
       if (tipModeEnabled) {
         exitTipMode();
         await exitFullscreenSafe();
+        updateTipFullscreenGate();
         return;
       }
       enterTipMode();
       // 安卓平板优先尝试浏览器全屏，失败时仍保留 Tip 覆盖层。
       await requestFullscreenSafe(document.documentElement);
+      updateTipFullscreenGate();
     });
     btnTipExit.addEventListener("click", async () => {
       exitTipMode();
       await exitFullscreenSafe();
+      updateTipFullscreenGate();
       location.href = "/";
     });
+
+    if (btnTipEnterBrowserFullscreen) {
+      btnTipEnterBrowserFullscreen.addEventListener("click", async () => {
+        await requestFullscreenSafe(document.documentElement);
+        updateTipFullscreenGate();
+      });
+    }
+    if (btnTipGateExitHome) {
+      btnTipGateExitHome.addEventListener("click", async () => {
+        exitTipMode();
+        await exitFullscreenSafe();
+        updateTipFullscreenGate();
+        location.href = "/";
+      });
+    }
     btnTipPlayPause.addEventListener("click", () => {
       if (!player || !player.src) return;
       if (player.paused) player.play().catch(() => {});
@@ -1329,9 +1434,11 @@
         syncTipProgressUI();
       });
     }
-    document.addEventListener("fullscreenchange", () => {
-      if (!document.fullscreenElement && tipModeEnabled) exitTipMode();
-    });
+    function onFullscreenEvent() {
+      updateTipFullscreenGate();
+    }
+    document.addEventListener("fullscreenchange", onFullscreenEvent);
+    document.addEventListener("webkitfullscreenchange", onFullscreenEvent);
 
     window.addEventListener("resize", () => {
       if (!naturalW) return;
@@ -1390,10 +1497,11 @@
     })();
 
     if (autoTipMode) {
-      // 自动进入 Tip：浏览器全屏可能因无用户手势被拒绝，拒绝时仍保留 Tip 覆盖层。
+      // 自动进入 Tip：浏览器全屏必须用户手势，失败时用遮罩引导点击一次。
       requestAnimationFrame(async () => {
         if (!tipModeEnabled) enterTipMode();
         await requestFullscreenSafe(document.documentElement);
+        updateTipFullscreenGate();
       });
     }
 
