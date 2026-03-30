@@ -487,7 +487,7 @@
               <line x1="7.6" y1="8.5" x2="9.4" y2="8.5" stroke="currentColor" stroke-width="2" />
             </svg>
           </button>
-          <button type="button" class="tip-side-btn" id="btnTipFollow" title="开：300% 缩放并将当前小节居中；关：恢复适应窗口">跟随关</button>
+          <button type="button" class="tip-side-btn" id="btnTipFollow" title="开：自适应缩放（最长小节约占屏宽 80%）并将当前小节居中；关：恢复适应窗口">跟随关</button>
           <button type="button" class="tip-side-btn" id="btnTipRateUp" title="加快倍速">速+</button>
           <div class="tip-side-rate" id="tipRateLabel">1x</div>
           <button type="button" class="tip-side-btn" id="btnTipRateDown" title="减慢倍速">速-</button>
@@ -523,7 +523,7 @@
         <input type="range" id="tipProgressRange" min="0" max="0" step="0.001" value="0" />
         <div class="tip-progress-time" id="tipProgressText">00:00 / 00:00</div>
       </div>
-      <p class="meta" style="margin-top:0.5rem;">默认在窗口内完整显示谱图；点<strong>「缩放跟随」</strong>可 200% 缩放并在播放时自动将当前小节滚到视口中央（再点一次关闭跟随并恢复适应窗口）。谱面区域可横向、纵向滚动。<strong>点击谱图</strong>播放/暂停。仅当前小节显示进度框与卡拉 OK 蒙层；不显示小节序号。</p>
+      <p class="meta" style="margin-top:0.5rem;">默认在窗口内完整显示谱图；点<strong>「缩放跟随」</strong>会按屏幕自适应缩放（最长小节约占屏宽 80%），并在播放时自动将当前小节滚到视口中央（再点一次关闭跟随并恢复适应窗口）。谱面区域可横向、纵向滚动。<strong>点击谱图</strong>播放/暂停。仅当前小节显示进度框与卡拉 OK 蒙层；不显示小节序号。</p>
       <p class="minimal-bottom-link"><a href="#" id="linkFullViewer">完整设置界面</a></p>
     </div>
   </div>
@@ -770,6 +770,27 @@
       if (!btnTipFollow) return;
       btnTipFollow.classList.toggle("tip-follow-on", followActiveMeasureEnabled);
       btnTipFollow.textContent = followActiveMeasureEnabled ? "跟随开" : "跟随关";
+    }
+
+    function computeAdaptiveFollowZoom() {
+      if (!scoreData || !scoreData.measures || !scoreData.measures.length) return null;
+      if (!naturalW || !naturalH || !wrap) return null;
+      const maxMeasureW = scoreData.measures.reduce((mx, m) => {
+        const w = m && m.rect && isFinite(m.rect.w) ? Number(m.rect.w) : 0;
+        return w > mx ? w : mx;
+      }, 0);
+      if (!(maxMeasureW > 0)) return null;
+
+      const pad = 8;
+      const availW = Math.max(40, wrap.clientWidth - pad);
+      const availH = Math.max(60, wrap.clientHeight - pad);
+      const fitW = availW / naturalW;
+      const fitH = availH / naturalH;
+      const baseFit = Math.min(fitW, fitH);
+      if (!(baseFit > 0)) return null;
+
+      const targetMeasureW = Math.max(80, wrap.clientWidth * 0.8);
+      return clampSheetZoom(targetMeasureW / (maxMeasureW * baseFit));
     }
 
     function updateTipButtonUI() {
@@ -1171,6 +1192,13 @@
           naturalW = sheet.naturalWidth;
           naturalH = sheet.naturalHeight;
           overlayAttempts = 0;
+          if (followActiveMeasureEnabled) {
+            const autoZoom = computeAdaptiveFollowZoom();
+            if (autoZoom != null) {
+              sheetUserZoom = autoZoom;
+              localStorage.setItem(LS_ZOOM, String(sheetUserZoom));
+            }
+          }
           applySheetLayout();
           requestAnimationFrame(() => {
             applySheetLayout();
@@ -1243,6 +1271,13 @@
           naturalW = sheet.naturalWidth;
           naturalH = sheet.naturalHeight;
           overlayAttempts = 0;
+          if (followActiveMeasureEnabled) {
+            const autoZoom = computeAdaptiveFollowZoom();
+            if (autoZoom != null) {
+              sheetUserZoom = autoZoom;
+              localStorage.setItem(LS_ZOOM, String(sheetUserZoom));
+            }
+          }
           applySheetLayout();
           requestAnimationFrame(() => {
             applySheetLayout();
@@ -1347,10 +1382,13 @@
         if (naturalW) applySheetLayout();
         else updateZoomLabel();
       } else {
-        sheetUserZoom = clampSheetZoom(3);
-        localStorage.setItem(LS_ZOOM, String(sheetUserZoom));
         followActiveMeasureEnabled = true;
         localStorage.setItem(LS_FOLLOW, "1");
+        const autoZoom = computeAdaptiveFollowZoom();
+        if (autoZoom != null) {
+          sheetUserZoom = autoZoom;
+          localStorage.setItem(LS_ZOOM, String(sheetUserZoom));
+        }
         lastFollowMeasureKey = null;
         updateZoomFollowButtonUI();
         if (naturalW) {
@@ -1442,6 +1480,13 @@
 
     window.addEventListener("resize", () => {
       if (!naturalW) return;
+      if (followActiveMeasureEnabled) {
+        const autoZoom = computeAdaptiveFollowZoom();
+        if (autoZoom != null) {
+          sheetUserZoom = autoZoom;
+          localStorage.setItem(LS_ZOOM, String(sheetUserZoom));
+        }
+      }
       applySheetLayout();
       if (followActiveMeasureEnabled) {
         requestAnimationFrame(() => scrollActiveMeasureToCenter());

@@ -33,10 +33,15 @@
     }
     .layout {
       display: flex; align-items: flex-start; gap: 0; max-width: 1400px; margin: 0 auto;
-      padding: 1rem 0 1rem 1.25rem; min-height: calc(100vh - 120px);
+      padding: 1rem 0 1rem 1.25rem; min-height: calc(100vh - 64px);
     }
     .main-col { flex: 1; min-width: 0; padding-right: 0.5rem; }
     .hint { font-size: 0.85rem; color: #9e9e9e; margin: 0 0 1rem; line-height: 1.5; }
+    /* 首页简化：隐藏 Token 行与说明文案；仍保留 DOM 供脚本读取 localStorage / 默认 token */
+    .token-row,
+    .hint {
+      display: none !important;
+    }
     #grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
