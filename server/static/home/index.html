@@ -82,8 +82,8 @@
     .card .sub { font-size: 0.72rem; color: #888; margin-top: 0.25rem; }
     .card-actions { padding: 0 0.6rem 0.6rem; }
     .btn-delete {
-      width: 100%; padding: 0.38rem 0.5rem; border-radius: 6px; border: 1px solid #8e3a3a;
-      background: #291515; color: #e57373; font-size: 0.72rem; cursor: pointer; font-family: inherit;
+      width: 50%; padding: 0.2rem 0.28rem; border-radius: 6px; border: 1px solid #8e3a3a;
+      background: #291515; color: #e57373; font-size: 0.64rem; cursor: pointer; font-family: inherit;
     }
     .btn-delete:hover { background: #3d2222; color: #ffab91; }
     .btn-delete:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -120,7 +120,7 @@
   </div>
   <div class="layout">
     <div class="main-col">
-      <p class="hint">以下为已打点、谱图与音频齐全的可演奏曲包。点击卡片进入阅览；卡片下方可<strong>删除</strong>服务器上的该套资源（需 Token）。删除若仍提示 405，请<strong>重启后端到最新代码</strong>并<strong>强制刷新</strong>本页（Ctrl+F5）。右侧按曲目标题<strong>首字拼音首字母</strong>筛选（英文取首字母，数字等归入 #）。</p>
+      <p class="hint">以下为已打点、谱图与音频齐全的可演奏曲包。点击卡片将直接进入 <strong>Tip 全屏播放</strong>；卡片下方可<strong>删除</strong>服务器上的该套资源（需 Token）。删除若仍提示 405，请<strong>重启后端到最新代码</strong>并<strong>强制刷新</strong>本页（Ctrl+F5）。右侧按曲目标题<strong>首字拼音首字母</strong>筛选（英文取首字母，数字等归入 #）。</p>
       <div id="grid"></div>
       <div id="status"></div>
     </div>
@@ -382,7 +382,7 @@
         card.addEventListener("click", () => {
           const t = (tokenInput.value || "").trim();
           if (t) localStorage.setItem(LS_TOKEN, t);
-          location.href = "/viewer/?open=" + encodeURIComponent(fid) + "&minimal=1";
+          location.href = "/viewer/?open=" + encodeURIComponent(fid) + "&minimal=1&tip=1";
         });
         gridEl.appendChild(card);
         const imgPath = s.files && s.files.image ? s.files.image : "/api/scores/" + fid + "/sheet.jpg";

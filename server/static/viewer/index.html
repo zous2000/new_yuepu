@@ -15,6 +15,7 @@
     button { margin: 0.5rem 0.5rem 0 0; padding: 0.45rem 0.85rem; cursor: pointer; }
     :root { --viewer-chrome-h: 280px; }
     body.viewer-minimal { --viewer-chrome-h: 210px; }
+    body.viewer-tip { --viewer-chrome-h: 160px; }
 
     #status { color: #ffb74d; font-size: 0.85rem; margin-bottom: 0.5rem; white-space: pre-wrap; word-break: break-word; min-height: 0; }
     #wrap {
@@ -152,6 +153,179 @@
     body.viewer-minimal #wrap {
       border-radius: 8px;
     }
+    body.viewer-tip {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+    }
+    body.viewer-tip .viewer-chrome,
+    body.viewer-tip .panel-side,
+    body.viewer-tip .minimal-bottom-link {
+      display: none !important;
+    }
+    body.viewer-tip .row {
+      margin: 0;
+      padding: 0;
+      gap: 0;
+    }
+    body.viewer-tip .panel.main {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      border-radius: 0;
+      border: 0;
+      padding: 0;
+      background: #090909;
+      width: 100vw;
+      max-width: none;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+    }
+    body.viewer-tip #wrap {
+      flex: 1 1 auto;
+      max-height: none;
+      min-height: 0;
+      border-radius: 0;
+      border: 0;
+      padding: 0;
+      background: #000;
+      margin-left: 50px;
+      justify-content: flex-start;
+      align-items: flex-start;
+    }
+    body.viewer-tip #status,
+    body.viewer-tip #scoreTitle,
+    body.viewer-tip #zoomBar,
+    body.viewer-tip #speedBar,
+    body.viewer-tip #tipBar,
+    body.viewer-tip .panel.main > .meta {
+      display: none !important;
+    }
+    body.viewer-tip #player {
+      display: none !important;
+    }
+    .tip-toolbar {
+      display: none;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.4rem;
+      margin: 0;
+    }
+    body.viewer-tip .tip-toolbar {
+      display: flex;
+      position: fixed;
+      top: max(8px, env(safe-area-inset-top));
+      right: max(8px, env(safe-area-inset-right));
+      z-index: 10001;
+    }
+    .tip-exit {
+      border: 1px solid #455a64;
+      background: rgba(27, 39, 48, 0.85);
+      color: #d7ecff;
+      border-radius: 8px;
+      padding: 0.34rem 0.72rem;
+      font-size: 0.86rem;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .tip-note {
+      color: #90caf9;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+    body.viewer-tip .tip-note {
+      display: none !important;
+    }
+    .tip-sidebar {
+      display: none;
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 50px;
+      height: 100dvh;
+      z-index: 10000;
+      background: rgba(8, 12, 16, 0.9);
+      border-right: 1px solid #263238;
+      align-items: center;
+      justify-content: center;
+      padding-top: max(6px, env(safe-area-inset-top));
+      padding-bottom: max(6px, env(safe-area-inset-bottom));
+      box-sizing: border-box;
+    }
+    body.viewer-tip .tip-sidebar {
+      display: flex;
+      transform: translateY(100px);
+    }
+    .tip-sidebar-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 42px;
+      align-items: center;
+    }
+    .tip-side-btn {
+      width: 40px;
+      min-width: 40px;
+      height: 36px;
+      margin: 0;
+      padding: 0;
+      border-radius: 8px;
+      border: 1px solid #455a64;
+      background: rgba(27, 39, 48, 0.9);
+      color: #d7ecff;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .tip-side-btn svg {
+      width: 20px;
+      height: 20px;
+      display: block;
+    }
+    .tip-side-rate {
+      color: #90caf9;
+      font-size: 11px;
+      line-height: 1;
+      margin: 2px 0;
+      user-select: none;
+    }
+
+    .tip-progress {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: max(8px, env(safe-area-inset-bottom));
+      z-index: 10003;
+      width: min(720px, calc(100vw - 80px));
+      padding: 6px 10px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.35);
+      box-sizing: border-box;
+      pointer-events: auto;
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+    }
+    body.viewer-tip .tip-progress {
+      display: flex;
+    }
+    .tip-progress input[type="range"] {
+      width: 100%;
+    }
+    .tip-progress-time {
+      font-size: 12px;
+      color: #b0bec5;
+      text-align: center;
+      user-select: none;
+      white-space: nowrap;
+    }
 
     .speed-bar {
       margin-top: 0.65rem;
@@ -180,8 +354,9 @@
       border-color: #5c6bc0;
       color: #fff;
     }
-    .speed-btns button#btnZoomFollow.zoom-follow-on {
+    .tip-side-btn.tip-follow-on {
       color: #90caf9;
+      border-color: #64b5f6;
     }
   </style>
 </head>
@@ -220,6 +395,38 @@
     <div class="panel main">
       <div id="status"></div>
       <div id="scoreTitle" class="meta" style="color:#e0e0e0;font-size:1rem;">尚未加载曲目</div>
+      <div class="tip-toolbar" id="tipToolbar">
+        <span class="tip-note">全屏 Tip 播放中（安卓平板优化）</span>
+        <button type="button" class="tip-exit" id="btnTipExit">返回</button>
+      </div>
+      <div class="tip-sidebar" id="tipSidebar" aria-label="Tip 控制栏">
+        <div class="tip-sidebar-inner">
+          <button type="button" class="tip-side-btn" id="btnTipPlayPause" title="播放/暂停">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <polygon points="7,5 15,10 7,15" fill="currentColor" />
+            </svg>
+          </button>
+          <button type="button" class="tip-side-btn" id="btnTipZoomIn" title="放大">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <circle cx="8.5" cy="8.5" r="5.2" fill="none" stroke="currentColor" stroke-width="2" />
+              <line x1="12.2" y1="12.2" x2="17" y2="17" stroke="currentColor" stroke-width="2" />
+              <line x1="7.6" y1="8.5" x2="9.4" y2="8.5" stroke="currentColor" stroke-width="2" />
+              <line x1="8.5" y1="7.6" x2="8.5" y2="9.4" stroke="currentColor" stroke-width="2" />
+            </svg>
+          </button>
+          <button type="button" class="tip-side-btn" id="btnTipZoomOut" title="缩小">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <circle cx="8.5" cy="8.5" r="5.2" fill="none" stroke="currentColor" stroke-width="2" />
+              <line x1="12.2" y1="12.2" x2="17" y2="17" stroke="currentColor" stroke-width="2" />
+              <line x1="7.6" y1="8.5" x2="9.4" y2="8.5" stroke="currentColor" stroke-width="2" />
+            </svg>
+          </button>
+          <button type="button" class="tip-side-btn" id="btnTipFollow" title="开：300% 缩放并将当前小节居中；关：恢复适应窗口">跟随关</button>
+          <button type="button" class="tip-side-btn" id="btnTipRateUp" title="加快倍速">速+</button>
+          <div class="tip-side-rate" id="tipRateLabel">1x</div>
+          <button type="button" class="tip-side-btn" id="btnTipRateDown" title="减慢倍速">速-</button>
+        </div>
+      </div>
       <div id="wrap">
         <div class="sheet-stack">
           <img id="sheet" alt="谱面" />
@@ -234,12 +441,21 @@
           <button type="button" id="btnZoomIn" title="放大">+</button>
           <button type="button" id="btnZoomFit" title="以窗口为基准重新适应">适应窗口</button>
           <span class="speed-label" id="zoomLabel" style="margin:0;min-width:2.75rem;text-align:center;">100%</span>
-          <button type="button" id="btnZoomFollow" title="开：200% 缩放并随播放小节居中；关：取消跟随并恢复适应窗口">缩放跟随</button>
         </div>
       </div>
       <div class="speed-bar" id="speedBar">
         <span class="speed-label">倍速</span>
         <div class="speed-btns" id="speedBtns"></div>
+      </div>
+      <div class="speed-bar" id="tipBar">
+        <span class="speed-label">显示</span>
+        <div class="speed-btns">
+          <button type="button" id="btnTipMode" title="进入上层 Tip 播放层，并尝试浏览器全屏">全屏 Tip 播放</button>
+        </div>
+      </div>
+      <div class="tip-progress" id="tipProgressWrap" aria-label="播放进度条">
+        <input type="range" id="tipProgressRange" min="0" max="0" step="0.001" value="0" />
+        <div class="tip-progress-time" id="tipProgressText">00:00 / 00:00</div>
       </div>
       <p class="meta" style="margin-top:0.5rem;">默认在窗口内完整显示谱图；点<strong>「缩放跟随」</strong>可 200% 缩放并在播放时自动将当前小节滚到视口中央（再点一次关闭跟随并恢复适应窗口）。谱面区域可横向、纵向滚动。<strong>点击谱图</strong>播放/暂停。仅当前小节显示进度框与卡拉 OK 蒙层；不显示小节序号。</p>
       <p class="minimal-bottom-link"><a href="#" id="linkFullViewer">完整设置界面</a></p>
@@ -263,9 +479,11 @@
     const LS_FOLLOW = "yuepu_viewer_follow_measure_center";
     let followActiveMeasureEnabled = localStorage.getItem(LS_FOLLOW) === "1";
     let lastFollowMeasureKey = null;
+    let tipModeEnabled = false;
 
     const qs = new URLSearchParams(location.search);
     const minimalMode = qs.get("minimal") === "1" || qs.get("m") === "1";
+    const autoTipMode = qs.get("tip") === "1";
     if (minimalMode) {
       document.body.classList.add("viewer-minimal");
     }
@@ -279,16 +497,29 @@
     });
 
     const wrap = document.getElementById("wrap");
+    const sheetStack = document.querySelector(".sheet-stack");
     const sheet = document.getElementById("sheet");
     const overlay = document.getElementById("overlay");
     const ctx = overlay && overlay.getContext ? overlay.getContext("2d") : null;
     const player = document.getElementById("player");
+    const playerControlsDefault = player ? player.controls : true;
     const statusEl = document.getElementById("status");
     const apiBaseInput = document.getElementById("apiBase");
     const appTokenInput = document.getElementById("appToken");
     const scoreSelect = document.getElementById("scoreSelect");
     const scoreTitleEl = document.getElementById("scoreTitle");
     const speedBtns = document.getElementById("speedBtns");
+    const btnTipMode = document.getElementById("btnTipMode");
+    const btnTipExit = document.getElementById("btnTipExit");
+    const btnTipPlayPause = document.getElementById("btnTipPlayPause");
+    const btnTipZoomIn = document.getElementById("btnTipZoomIn");
+    const btnTipZoomOut = document.getElementById("btnTipZoomOut");
+    const btnTipFollow = document.getElementById("btnTipFollow");
+    const btnTipRateUp = document.getElementById("btnTipRateUp");
+    const btnTipRateDown = document.getElementById("btnTipRateDown");
+    const tipRateLabel = document.getElementById("tipRateLabel");
+    const tipProgressRange = document.getElementById("tipProgressRange");
+    const tipProgressText = document.getElementById("tipProgressText");
 
     const LS_BASE = "yuepu_viewer_api_base";
     const LS_TOKEN = "yuepu_viewer_app_token";
@@ -314,6 +545,7 @@
       player.playbackRate = rate;
       localStorage.setItem(LS_RATE, String(rate));
       updateSpeedUI(rate);
+      if (tipRateLabel) tipRateLabel.textContent = rate + "x";
     }
 
     SPEEDS.forEach((r) => {
@@ -339,6 +571,7 @@
       const r = player.playbackRate;
       const hit = SPEEDS.find((x) => Math.abs(x - r) < 0.05);
       if (hit != null) updateSpeedUI(hit);
+      if (tipRateLabel) tipRateLabel.textContent = (hit != null ? hit : r.toFixed(2)) + "x";
     });
 
     function setWrapInteractive(on) {
@@ -349,6 +582,10 @@
     wrap.addEventListener("click", (e) => {
       if (!player.src || !sheet.src) return;
       e.preventDefault();
+      if (tipModeEnabled) {
+        seekToMeasureByTipClick(e.clientX, e.clientY);
+        return;
+      }
       if (player.paused) {
         player.play().catch(() => {});
       } else {
@@ -461,8 +698,131 @@
     }
 
     function updateZoomFollowButtonUI() {
-      const btn = document.getElementById("btnZoomFollow");
-      if (btn) btn.classList.toggle("zoom-follow-on", followActiveMeasureEnabled);
+      if (!btnTipFollow) return;
+      btnTipFollow.classList.toggle("tip-follow-on", followActiveMeasureEnabled);
+      btnTipFollow.textContent = followActiveMeasureEnabled ? "跟随开" : "跟随关";
+    }
+
+    function updateTipButtonUI() {
+      if (!btnTipMode) return;
+      btnTipMode.classList.toggle("active", tipModeEnabled);
+      btnTipMode.textContent = tipModeEnabled ? "退出全屏 Tip" : "全屏 Tip 播放";
+    }
+
+    function cyclePlaybackRate(dir) {
+      const current = player && isFinite(player.playbackRate) ? player.playbackRate : parseStoredRate();
+      let idx = 0;
+      let best = Infinity;
+      SPEEDS.forEach((v, i) => {
+        const d = Math.abs(v - current);
+        if (d < best) {
+          best = d;
+          idx = i;
+        }
+      });
+      const next = Math.max(0, Math.min(SPEEDS.length - 1, idx + dir));
+      setPlaybackRate(SPEEDS[next]);
+    }
+
+    async function requestFullscreenSafe(el) {
+      const target = el || document.documentElement;
+      const req = target.requestFullscreen || target.webkitRequestFullscreen || target.msRequestFullscreen;
+      if (!req) return false;
+      try {
+        await req.call(target);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function exitFullscreenSafe() {
+      const ex = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+      if (!ex) return;
+      try {
+        await ex.call(document);
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
+    let wakeLockSentinel = null;
+    async function setTipWakeLock(enabled) {
+      if (!enabled) {
+        if (wakeLockSentinel) {
+          try {
+            await wakeLockSentinel.release();
+          } catch (e) {
+            /* ignore */
+          }
+          wakeLockSentinel = null;
+        }
+        return;
+      }
+      // Wake Lock 仅部分浏览器支持；安卓/苹果会进入降级分支（不影响播放）。
+      try {
+        // @ts-ignore
+        if (!("wakeLock" in navigator)) return;
+        // @ts-ignore
+        wakeLockSentinel = await navigator.wakeLock.request("screen");
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
+    function formatTipTime(sec) {
+      const s = Number(sec);
+      if (!isFinite(s) || s < 0) return "00:00";
+      const m = Math.floor(s / 60);
+      const r = Math.floor(s % 60);
+      return String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0");
+    }
+
+    function syncTipProgressUI() {
+      if (!tipModeEnabled) return;
+      if (!tipProgressRange || !tipProgressText || !player) return;
+      const dur = player.duration;
+      if (!isFinite(dur) || dur <= 0) return;
+      const cur = isFinite(player.currentTime) ? player.currentTime : 0;
+      tipProgressRange.max = String(dur);
+      tipProgressRange.value = String(Math.min(Math.max(cur, 0), dur));
+      tipProgressText.textContent = formatTipTime(cur) + " / " + formatTipTime(dur);
+    }
+
+    function syncTipPlayPauseIcon() {
+      if (!btnTipPlayPause || !player) return;
+      const isPaused = player.paused || player.ended;
+      if (isPaused) {
+        btnTipPlayPause.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><polygon points="7,5 15,10 7,15" fill="currentColor" /></svg>';
+      } else {
+        btnTipPlayPause.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect x="7" y="5" width="2.2" height="10" rx="1" fill="currentColor" /><rect x="10.8" y="5" width="2.2" height="10" rx="1" fill="currentColor" /></svg>';
+      }
+    }
+
+    function enterTipMode() {
+      tipModeEnabled = true;
+      document.body.classList.add("viewer-tip");
+      updateTipButtonUI();
+      if (player) player.controls = false;
+      setTipWakeLock(true);
+      syncTipProgressUI();
+      syncTipPlayPauseIcon();
+      if (naturalW) {
+        applySheetLayout();
+        if (followActiveMeasureEnabled) requestAnimationFrame(() => scrollActiveMeasureToCenter());
+      }
+    }
+
+    function exitTipMode() {
+      tipModeEnabled = false;
+      document.body.classList.remove("viewer-tip");
+      updateTipButtonUI();
+      if (player) player.controls = playerControlsDefault;
+      setTipWakeLock(false);
+      if (naturalW) {
+        applySheetLayout();
+        if (followActiveMeasureEnabled) requestAnimationFrame(() => scrollActiveMeasureToCenter());
+      }
     }
 
     /** 在 #wrap 可视区域内「适应」整张谱图，再乘以 sheetUserZoom；避免用 CSS transform，以便 overlay 与像素对齐 */
@@ -480,6 +840,22 @@
       sheet.style.height = "auto";
       sheet.style.maxWidth = "none";
       sheet.style.maxHeight = "none";
+      if (sheetStack) {
+        if (tipModeEnabled && followActiveMeasureEnabled) {
+          // 跟随开启时给四周留出“半屏”滚动缓冲，确保边缘小节也能被滚到屏幕中心。
+          const edgeX = Math.max(0, Math.floor(wrap.clientWidth / 2));
+          const edgeY = Math.max(0, Math.floor(wrap.clientHeight / 2));
+          sheetStack.style.marginLeft = edgeX + "px";
+          sheetStack.style.marginRight = edgeX + "px";
+          sheetStack.style.marginTop = edgeY + "px";
+          sheetStack.style.marginBottom = edgeY + "px";
+        } else {
+          sheetStack.style.marginLeft = "0";
+          sheetStack.style.marginRight = "0";
+          sheetStack.style.marginTop = "0";
+          sheetStack.style.marginBottom = "0";
+        }
+      }
       syncOverlay();
       updateZoomLabel();
     }
@@ -504,11 +880,80 @@
       return null;
     }
 
+    /**
+     * 用于“高亮/跟随”的容错：当 tMs 不在任何小节区间内（可能存在间隙或边界浮动）
+     * 则选择“最近的上一小节”，否则选择“第一小节”。
+     * @returns {{ m: object, i: number } | null}
+     */
+    function findMeasureForHighlightAt(tMs) {
+      if (!scoreData || !scoreData.measures || !scoreData.measures.length) return null;
+      const measures = scoreData.measures;
+      let prev = null;
+      let prevI = -1;
+      for (let i = 0; i < measures.length; i++) {
+        const m = measures[i];
+        if (tMs >= m.startTimeMs && tMs < m.endTimeMs) return { m, i };
+        if (tMs >= m.endTimeMs) {
+          prev = m;
+          prevI = i;
+        }
+      }
+      if (prev) return { m: prev, i: prevI };
+      return { m: measures[0], i: 0 };
+    }
+
+    /** Tip 模式下：根据点击坐标定位小节；相对当前小节左/上为后退，右/下为前进 */
+    function seekToMeasureByTipClick(clientX, clientY) {
+      if (!scoreData || !scoreData.measures || !naturalW || !naturalH) return;
+      const sr = sheet.getBoundingClientRect();
+      if (sr.width < 2 || sr.height < 2) return;
+      const px = clientX - sr.left;
+      const py = clientY - sr.top;
+      if (px < 0 || py < 0 || px > sr.width || py > sr.height) return;
+
+      const scaleNX = naturalW / sr.width;
+      const scaleNY = naturalH / sr.height;
+      const nx = px * scaleNX;
+      const ny = py * scaleNY;
+      const measures = scoreData.measures || [];
+      const hits = measures.filter((m) => nx >= m.rect.x && nx <= m.rect.x + m.rect.w && ny >= m.rect.y && ny <= m.rect.y + m.rect.h);
+      if (!hits.length) return;
+
+      const nowMs = (player && isFinite(player.currentTime) ? player.currentTime : 0) * 1000;
+      let chosen = null;
+      const active = findActiveMeasureAt(nowMs);
+      if (active && active.m && active.m.rect) {
+        const c = active.m.rect;
+        const cx = c.x + c.w / 2;
+        const cy = c.y + c.h / 2;
+        const goBackward = nx < cx || ny < cy;
+        if (goBackward) {
+          const prior = hits.filter((m) => m.startTimeMs <= nowMs);
+          if (prior.length) chosen = prior.reduce((a, b) => (a.startTimeMs >= b.startTimeMs ? a : b));
+          else chosen = hits.reduce((a, b) => (a.startTimeMs <= b.startTimeMs ? a : b));
+        } else {
+          const later = hits.filter((m) => m.startTimeMs >= nowMs);
+          if (later.length) chosen = later.reduce((a, b) => (a.startTimeMs <= b.startTimeMs ? a : b));
+          else chosen = hits.reduce((a, b) => (a.startTimeMs >= b.startTimeMs ? a : b));
+        }
+      } else {
+        // 未命中当前活动小节时，保持原有“就近回退”策略兜底。
+        const prior = hits.filter((m) => m.startTimeMs <= nowMs);
+        if (prior.length) chosen = prior.reduce((a, b) => (a.startTimeMs >= b.startTimeMs ? a : b));
+        else chosen = hits.reduce((a, b) => (a.startTimeMs <= b.startTimeMs ? a : b));
+      }
+      if (!chosen) return;
+      player.currentTime = Math.max(0, chosen.startTimeMs / 1000);
+      lastFollowMeasureKey = null;
+      drawOverlay();
+      if (followActiveMeasureEnabled) requestAnimationFrame(() => scrollActiveMeasureToCenter());
+    }
+
     /** 将当前播放时间所在小节的中心点对齐到 #wrap 视口中心（依赖 getBoundingClientRect，须在布局完成后调用） */
     function scrollActiveMeasureToCenter() {
       if (!naturalW || !naturalH || !wrap || !sheet) return;
       const tMs = (player && isFinite(player.currentTime) ? player.currentTime : 0) * 1000;
-      const hit = findActiveMeasureAt(tMs);
+      const hit = findMeasureForHighlightAt(tMs);
       if (!hit) return;
       const m = hit.m;
 
@@ -523,6 +968,7 @@
       const cxScreen = sr.left + cx;
       const cyScreen = sr.top + cy;
 
+      // Tip 模式下左侧有 50px 控制栏，所以“屏幕中心”应当等价为 #wrap（谱面可视区）的中心
       const targetX = wr.left + wr.width / 2;
       const targetY = wr.top + wr.height / 2;
 
@@ -534,7 +980,7 @@
       if (!followActiveMeasureEnabled || !scoreData) return;
       if (!player || player.paused || player.ended) return;
       const tMs = (isFinite(player.currentTime) ? player.currentTime : 0) * 1000;
-      const hit = findActiveMeasureAt(tMs);
+      const hit = findMeasureForHighlightAt(tMs);
       const key = measureStableKey(hit);
       if (key === lastFollowMeasureKey) return;
       lastFollowMeasureKey = key;
@@ -550,19 +996,18 @@
       ctx.clearRect(0, 0, w, h);
       const tMs = (player && isFinite(player.currentTime) ? player.currentTime : 0) * 1000;
       const measures = scoreData.measures || [];
+      const highlight = findMeasureForHighlightAt(tMs);
 
       const playedFill = "rgba(12, 14, 22, 0.52)";
       const playedEdge = "rgba(144, 202, 249, 0.75)";
       const activeStroke = "rgba(100, 181, 246, 0.95)";
 
       measures.forEach((m) => {
+        if (!highlight || m !== highlight.m) return;
         const x = m.rect.x * scaleX;
         const y = m.rect.y * scaleY;
         const rw = m.rect.w * scaleX;
         const rh = m.rect.h * scaleY;
-        const active = tMs >= m.startTimeMs && tMs < m.endTimeMs;
-        if (!active) return;
-
         const ratio = measurePlayRatio(tMs, m);
         const pw = ratio >= 1 ? rw : ratio > 0 ? Math.max(1, ratio * rw) : 0;
         if (pw > 0) {
@@ -804,7 +1249,7 @@
       else updateZoomLabel();
     });
 
-    document.getElementById("btnZoomFollow").addEventListener("click", () => {
+    btnTipFollow.addEventListener("click", () => {
       if (followActiveMeasureEnabled) {
         followActiveMeasureEnabled = false;
         localStorage.setItem(LS_FOLLOW, "0");
@@ -815,7 +1260,7 @@
         if (naturalW) applySheetLayout();
         else updateZoomLabel();
       } else {
-        sheetUserZoom = clampSheetZoom(2);
+        sheetUserZoom = clampSheetZoom(3);
         localStorage.setItem(LS_ZOOM, String(sheetUserZoom));
         followActiveMeasureEnabled = true;
         localStorage.setItem(LS_FOLLOW, "1");
@@ -834,6 +1279,59 @@
 
     updateZoomLabel();
     updateZoomFollowButtonUI();
+    updateTipButtonUI();
+    if (tipRateLabel) tipRateLabel.textContent = parseStoredRate() + "x";
+
+    btnTipMode.addEventListener("click", async () => {
+      if (tipModeEnabled) {
+        exitTipMode();
+        await exitFullscreenSafe();
+        return;
+      }
+      enterTipMode();
+      // 安卓平板优先尝试浏览器全屏，失败时仍保留 Tip 覆盖层。
+      await requestFullscreenSafe(document.documentElement);
+    });
+    btnTipExit.addEventListener("click", async () => {
+      exitTipMode();
+      await exitFullscreenSafe();
+      location.href = "/";
+    });
+    btnTipPlayPause.addEventListener("click", () => {
+      if (!player || !player.src) return;
+      if (player.paused) player.play().catch(() => {});
+      else player.pause();
+    });
+    btnTipZoomIn.addEventListener("click", () => {
+      sheetUserZoom = clampSheetZoom(sheetUserZoom * ZOOM_STEP);
+      localStorage.setItem(LS_ZOOM, String(sheetUserZoom));
+      if (naturalW) applySheetLayout();
+      else updateZoomLabel();
+    });
+    btnTipZoomOut.addEventListener("click", () => {
+      sheetUserZoom = clampSheetZoom(sheetUserZoom / ZOOM_STEP);
+      localStorage.setItem(LS_ZOOM, String(sheetUserZoom));
+      if (naturalW) applySheetLayout();
+      else updateZoomLabel();
+    });
+    btnTipRateUp.addEventListener("click", () => cyclePlaybackRate(1));
+    btnTipRateDown.addEventListener("click", () => cyclePlaybackRate(-1));
+    if (tipProgressRange) {
+      tipProgressRange.addEventListener("input", () => {
+        if (!tipModeEnabled) return;
+        if (!player) return;
+        const v = parseFloat(tipProgressRange.value);
+        if (!isFinite(v)) return;
+        lastFollowMeasureKey = null;
+        player.currentTime = v;
+        drawOverlay();
+        if (followActiveMeasureEnabled) requestAnimationFrame(() => scrollActiveMeasureToCenter());
+        syncTipProgressUI();
+      });
+    }
+    document.addEventListener("fullscreenchange", () => {
+      if (!document.fullscreenElement && tipModeEnabled) exitTipMode();
+    });
 
     window.addEventListener("resize", () => {
       if (!naturalW) return;
@@ -843,23 +1341,35 @@
       }
     });
 
-    player.addEventListener("timeupdate", () => drawOverlay());
+    player.addEventListener("timeupdate", () => {
+      drawOverlay();
+      syncTipProgressUI();
+    });
     player.addEventListener("seeked", () => {
       lastFollowMeasureKey = null;
       drawOverlay();
+      syncTipProgressUI();
       if (followActiveMeasureEnabled) {
         requestAnimationFrame(() => scrollActiveMeasureToCenter());
       }
       if (!player.paused) scheduleOverlayLoop();
     });
-    player.addEventListener("play", () => scheduleOverlayLoop());
+    player.addEventListener("play", () => {
+      updateTipButtonUI();
+      syncTipPlayPauseIcon();
+      scheduleOverlayLoop();
+    });
     player.addEventListener("pause", () => {
       stopOverlayRaf();
       drawOverlay();
+      syncTipPlayPauseIcon();
+      syncTipProgressUI();
     });
     player.addEventListener("ended", () => {
       stopOverlayRaf();
       drawOverlay();
+      syncTipPlayPauseIcon();
+      syncTipProgressUI();
     });
 
     (function bootFromQuery() {
@@ -878,6 +1388,14 @@
       const token = (appTokenInput.value || "").trim();
       if (base && token) openScore(openId.trim());
     })();
+
+    if (autoTipMode) {
+      // 自动进入 Tip：浏览器全屏可能因无用户手势被拒绝，拒绝时仍保留 Tip 覆盖层。
+      requestAnimationFrame(async () => {
+        if (!tipModeEnabled) enterTipMode();
+        await requestFullscreenSafe(document.documentElement);
+      });
+    }
 
     (function bindExitPreview() {
       const btnExit = document.getElementById("btnExitPreview");
